@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { BottomNavigation } from 'react-native-paper';
+import { View, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { routes, Route } from '../routes';
+import { routes } from '../routes';
 import FactsRoute from './FactsRoute';
 import CombosRoute from './CombosRoute';
 import WikiRoute from './WikiRoute';
@@ -30,11 +31,31 @@ export default function HomeScreen({ theme }: HomeScreenProps) {
       navigationState={{ index, routes }}
       onIndexChange={setIndex}
       renderScene={renderScene}
-      renderIcon={({ route, color }) => (
-        <MaterialCommunityIcons name={route.icon} size={24} color={color} />
+      renderIcon={({ route, focused }) => (
+        <View style={styles.iconContainer}>
+          <MaterialCommunityIcons 
+            name={route.icon} 
+            size={focused ? 28 : 24} // Dynamic size for selected state (Material 3)
+            color={focused ? theme.colors.primary : theme.colors.onSurfaceVariant} // Dynamic color based on selection
+          />
+        </View>
       )}
-      barStyle={{ backgroundColor: theme.colors.primary }}
+      barStyle={{
+        backgroundColor: theme.colors.surface, // Using surface color from the theme
+        elevation: 3, // Material 3 elevation value
+        borderTopLeftRadius: 16, // Rounded corners for modern look
+        borderTopRightRadius: 16,
+      }}
       shifting={true}
+      labeled={true} // Ensure labels are always visible
     />
   );
 }
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    flex: 1, // Take up the full height of the parent View
+    justifyContent: 'center', // Center vertically
+    alignItems: 'center', // Center horizontally
+  },
+});
