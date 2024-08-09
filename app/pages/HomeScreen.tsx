@@ -54,8 +54,14 @@ export default function HomeScreen({ theme }: HomeScreenProps) {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    flex: 1, // Take up the full height of the parent View
+    height: '100%', // Take up the full height of the BottomNavigation
     justifyContent: 'center', // Center vertically
     alignItems: 'center', // Center horizontally
+    width: '100%', // Take up the full width to avoid any misalignment
+  },
+  parentContainer: {
+    flexDirection: 'row', // Ensure the icons are laid out in a row
+    alignItems: 'center', // Center the icons vertically
+    justifyContent: 'space-around', // Distribute the icons evenly
   },
 });
