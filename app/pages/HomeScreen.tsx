@@ -10,7 +10,7 @@ import ContactRoute from './ContactRoute';
 import AboutRoute from './AboutRoute';
 
 interface HomeScreenProps {
-  theme: typeof import('./themes').lightTheme;
+  theme: typeof import('../themes').lightTheme;
 }
 
 export default function HomeScreen({ theme }: HomeScreenProps) {
