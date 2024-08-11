@@ -1,143 +1,149 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Searchbar, Card, Button, useTheme } from 'react-native-paper';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Searchbar, Chip, Card, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '@react-navigation/native';
 
-// Import the combos data and definitions
-const comboData = require('../data/combos.json');
-const comboDefinitions = require('../data/combo_definitions.json');
-
-type DrugCombo = {
-  [key: string]: {
-    status: string;
-    note?: string;
-  };
-};
+// URLs for the JSON data
+const COMBOS_URL = 'https://raw.githubusercontent.com/TripSit/drugs/main/combos.json';
+const COMBO_DEFINITIONS_URL = 'https://raw.githubusercontent.com/TripSit/drugs/main/combo_definitions.json';
 
 const CombosRoute = () => {
-  const theme = useTheme();
-  const [firstDrugQuery, setFirstDrugQuery] = useState('');
-  const [secondDrugQuery, setSecondDrugQuery] = useState('');
-  const [selectedFirstDrug, setSelectedFirstDrug] = useState<string | null>(null);
-  const [selectedSecondDrug, setSelectedSecondDrug] = useState<string | null>(null);
-  const [drugCombos, setDrugCombos] = useState<DrugCombo | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDrugs, setSelectedDrugs] = useState<string[]>([]);
+  const [combosData, setCombosData] = useState({});
+  const [comboDefinitions, setComboDefinitions] = useState({});
+  const { colors } = useTheme();
 
+  // Fetch data on component mount
   useEffect(() => {
-    loadDrugCombos();
+    const fetchData = async () => {
+      try {
+        const [cachedCombos, cachedDefinitions] = await Promise.all([
+          AsyncStorage.getItem('combos'),
+          AsyncStorage.getItem('combo_definitions'),
+        ]);
+
+        if (cachedCombos && cachedDefinitions) {
+          setCombosData(JSON.parse(cachedCombos));
+          setComboDefinitions(JSON.parse(cachedDefinitions));
+        }
+
+        const [combosResponse, definitionsResponse] = await Promise.all([
+          fetch(COMBOS_URL),
+          fetch(COMBO_DEFINITIONS_URL),
+        ]);
+
+        const combosJson = await combosResponse.json();
+        const definitionsJson = await definitionsResponse.json();
+
+        setCombosData(combosJson);
+        setComboDefinitions(definitionsJson);
+
+        await AsyncStorage.setItem('combos', JSON.stringify(combosJson));
+        await AsyncStorage.setItem('combo_definitions', JSON.stringify(definitionsJson));
+      } catch (error) {
+        Alert.alert('Error', 'Failed to fetch or store data.');
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const loadDrugCombos = async () => {
-    try {
-      const cachedCombos = await AsyncStorage.getItem('drugCombos');
-      if (cachedCombos) {
-        setDrugCombos(JSON.parse(cachedCombos));
-      } else {
-        setDrugCombos(comboData);
-        await AsyncStorage.setItem('drugCombos', JSON.stringify(comboData));
-      }
-    } catch (error) {
-      console.error('Failed to load combos:', error);
-    }
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
   };
 
-  const handleDrugSelect = (drug: string, type: 'first' | 'second') => {
-    if (type === 'first') {
-      setSelectedFirstDrug(drug);
-    } else {
-      setSelectedSecondDrug(drug);
-    }
+  const toggleDrugSelection = (drug: string) => {
+    setSelectedDrugs((prevSelected) =>
+      prevSelected.includes(drug)
+        ? prevSelected.filter((d) => d !== drug)
+        : [...prevSelected, drug]
+    );
   };
 
-  const getComboResult = () => {
-    if (selectedFirstDrug && selectedSecondDrug && drugCombos) {
-      const [drug1, drug2] = [selectedFirstDrug, selectedSecondDrug].sort();
-      const comboKey = `${drug1}-${drug2}`;
-      return drugCombos[comboKey];
-    }
-    return null;
-  };
+  const renderCombinationResult = () => {
+    if (selectedDrugs.length < 2) return null;
 
-  const renderDrugOption = (drug: string, type: 'first' | 'second') => (
-    <TouchableOpacity key={drug} onPress={() => handleDrugSelect(drug, type)}>
-      <Card style={styles.drugOptionCard}>
+    const drug1 = selectedDrugs[0];
+    const drug2 = selectedDrugs[1];
+    const interaction = combosData[drug1]?.[drug2];
+
+    if (!interaction) {
+      return (
+        <Text style={styles.noInteractionText}>No interaction data available for this combination.</Text>
+      );
+    }
+
+    return (
+      <Card style={styles.resultCard}>
+        <Card.Title
+          title={`${drug1.toUpperCase()} + ${drug2.toUpperCase()}`}
+          left={(props) => <MaterialCommunityIcons {...props} name="flask" size={40} />}
+        />
         <Card.Content>
-          <Text>{drug}</Text>
+          <Text style={styles.interactionText}>Status: {interaction.status}</Text>
+          <Text style={styles.interactionNote}>{interaction.note}</Text>
+          <Text style={styles.interactionDetail}>
+            {comboDefinitions[interaction.status]}
+          </Text>
         </Card.Content>
       </Card>
-    </TouchableOpacity>
-  );
+    );
+  };
 
-  const filteredFirstDrugs = Object.keys(comboDefinitions).filter((drug) =>
-    drug.toLowerCase().includes(firstDrugQuery.toLowerCase())
+  const filteredDrugs = Object.keys(combosData).filter((drug) =>
+    drug.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const filteredSecondDrugs = Object.keys(comboDefinitions).filter((drug) =>
-    drug.toLowerCase().includes(secondDrugQuery.toLowerCase())
-  );
-
-  const comboResult = getComboResult();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Search bar for the first drug */}
+    <View style={{ flex: 1, padding: 16 }}>
       <Searchbar
-        placeholder="Search for first drug"
-        onChangeText={setFirstDrugQuery}
-        value={firstDrugQuery}
-        style={styles.searchbar}
+        placeholder="Search for a drug"
+        onChangeText={handleSearch}
+        value={searchQuery}
+        style={styles.searchBar}
       />
-      <ScrollView style={styles.drugList}>
-        {filteredFirstDrugs.map((drug) => renderDrugOption(drug, 'first'))}
-      </ScrollView>
-
-      {/* Search bar for the second drug */}
-      <Searchbar
-        placeholder="Search for second drug"
-        onChangeText={setSecondDrugQuery}
-        value={secondDrugQuery}
-        style={styles.searchbar}
+      <FlatList
+        data={filteredDrugs}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => (
+          <TouchableOpacity onPress={() => toggleDrugSelection(item)}>
+            <Chip
+              mode="outlined"
+              selected={selectedDrugs.includes(item)}
+              style={[
+                styles.chip,
+                { backgroundColor: selectedDrugs.includes(item) ? colors.primary : '#FFFFFF' },
+              ]}
+              textStyle={[
+                styles.chipText,
+                { color: selectedDrugs.includes(item) ? '#FFFFFF' : colors.text },
+              ]}
+            >
+              {item}
+            </Chip>
+          </TouchableOpacity>
+        )}
+        horizontal
+        contentContainerStyle={styles.drugList}
       />
-      <ScrollView style={styles.drugList}>
-        {filteredSecondDrugs.map((drug) => renderDrugOption(drug, 'second'))}
+      <ScrollView contentContainerStyle={styles.resultContainer}>
+        {renderCombinationResult()}
       </ScrollView>
-
-      {comboResult ? (
-        <Card style={styles.resultCard}>
-          <Card.Content>
-            <MaterialCommunityIcons
-              name="flask"
-              size={40}
-              color={theme.colors.primary}
-              style={styles.resultIcon}
-            />
-            <Text style={styles.resultText}>
-              {selectedFirstDrug} + {selectedSecondDrug}
-            </Text>
-            <Text style={[styles.statusText, { color: theme.colors.primary }]}>
-              Status: {comboResult.status}
-            </Text>
-            {comboResult.note && <Text style={styles.noteText}>{comboResult.note}</Text>}
-          </Card.Content>
-        </Card>
-      ) : (
-        selectedFirstDrug && selectedSecondDrug && (
-          <Text style={styles.errorText}>
-            No interaction information available for the selected combination.
-          </Text>
-        )
-      )}
-
       <Button
         mode="contained"
-        onPress={() => {
-          setSelectedFirstDrug(null);
-          setSelectedSecondDrug(null);
-          setFirstDrugQuery('');
-          setSecondDrugQuery('');
-        }}
+        onPress={() => setSelectedDrugs([])}
         style={styles.clearButton}
-        labelStyle={styles.clearButtonText}
       >
         Clear Selection
       </Button>
@@ -146,57 +152,48 @@ const CombosRoute = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
+  searchBar: {
+    marginBottom: 20,
   },
-  searchbar: {
-    marginBottom: 16,
-    borderRadius: 10,
+  chip: {
+    marginHorizontal: 4,
+    marginVertical: 8,
+  },
+  chipText: {
+    fontSize: 16,
   },
   drugList: {
-    marginBottom: 16,
+    paddingVertical: 10,
   },
-  drugOptionCard: {
-    marginVertical: 4,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+  resultContainer: {
+    flexGrow: 1,
+    paddingVertical: 20,
   },
   resultCard: {
-    marginVertical: 20,
-    borderRadius: 10,
+    marginBottom: 20,
   },
-  resultIcon: {
-    alignSelf: 'center',
+  interactionText: {
+    fontSize: 18,
     marginBottom: 10,
   },
-  resultText: {
-    fontSize: 24,
-    textAlign: 'center',
-    fontWeight: 'bold',
+  interactionNote: {
+    fontSize: 16,
+    marginBottom: 10,
+    fontStyle: 'italic',
   },
-  statusText: {
+  interactionDetail: {
+    fontSize: 14,
+    color: '#888',
+  },
+  noInteractionText: {
     fontSize: 18,
     textAlign: 'center',
-    marginVertical: 10,
-  },
-  noteText: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#6a6a6a',
-  },
-  errorText: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#ff0000',
+    color: '#888',
     marginVertical: 20,
   },
   clearButton: {
-    marginTop: 'auto',
-    borderRadius: 30,
-  },
-  clearButtonText: {
-    fontSize: 16,
+    marginTop: 20,
+    alignSelf: 'center',
   },
 });
 
