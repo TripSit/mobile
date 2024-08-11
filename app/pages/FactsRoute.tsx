@@ -1,10 +1,9 @@
 import * as React from 'react';
-import { View, FlatList, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Button } from 'react-native';
+import { View, FlatList, Text, StyleSheet, ActivityIndicator, TouchableOpacity, useColorScheme } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Searchbar, Card, Title, Paragraph, Chip } from 'react-native-paper';
-import DrugDetailScreen from '../components/DrugDetail'; // Import the DrugDetailScreen
+import DrugDetailScreen from '../components/DrugDetail';
 
-// Define types for the drug data
 type Drug = {
   id: string;
   name: string;
@@ -17,7 +16,8 @@ const FactsRoute: React.FC = () => {
   const [filteredData, setFilteredData] = useState<Drug[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedDrug, setSelectedDrug] = useState<Drug | null>(null);  // State for selected drug
+  const [selectedDrug, setSelectedDrug] = useState<Drug | null>(null);  // state
+  const isDarkMode = useColorScheme() === 'dark';
 
   useEffect(() => {
     fetch('https://tripsit.me/api/tripsit/getalldrugs')
@@ -87,21 +87,21 @@ const FactsRoute: React.FC = () => {
       <TouchableOpacity
         onPress={() => setSelectedDrug(item)}
       >
-        <Card style={styles.card}>
+        <Card style={styles(isDarkMode).card}>
           <Card.Content>
-            <Title style={styles.title}>{item.name}</Title>
-            <View style={styles.chipContainer}>
+            <Title style={styles(isDarkMode).title}>{item.name}</Title>
+            <View style={styles(isDarkMode).chipContainer}>
               {categoriesArray.map((category, index) => (
                 <Chip
                   key={index}
-                  style={[styles.chip, { backgroundColor: getCategoryColor(category) }]}
-                  textStyle={styles.chipText}
+                  style={[styles(isDarkMode).chip, { backgroundColor: getCategoryColor(category) }]}
+                  textStyle={styles(isDarkMode).chipText}
                 >
                   {category}
                 </Chip>
               ))}
             </View>
-            <Paragraph style={styles.summary}>{item.summary}</Paragraph>
+            <Paragraph style={styles(isDarkMode).summary}>{item.summary}</Paragraph>
           </Card.Content>
         </Card>
       </TouchableOpacity>
@@ -110,9 +110,9 @@ const FactsRoute: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles(isDarkMode).loadingContainer}>
         <ActivityIndicator size="large" color="#6200ee" />
-        <Text>Loading...</Text>
+        <Text style={styles(isDarkMode).loadingText}>Loading...</Text>
       </View>
     );
   }
@@ -126,29 +126,35 @@ const FactsRoute: React.FC = () => {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles(isDarkMode).container}>
       <Searchbar
         placeholder="Search"
         onChangeText={handleSearch}
         value={searchQuery}
-        style={styles.searchBar}
+        style={styles(isDarkMode).searchBar}
+        inputStyle={{ color: isDarkMode ? '#FFFFFF' : '#000000' }}
       />
       <FlatList
         data={filteredData}
         keyExtractor={(item) => item.id}
         renderItem={renderDrug}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles(isDarkMode).listContainer}
       />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (isDarkMode: boolean) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: isDarkMode ? '#1E1E1E' : '#F0F0F0',
+  },
   searchBar: {
     margin: 10,
     marginTop: 50,
     borderRadius: 10,
     elevation: 3,
+    backgroundColor: isDarkMode ? '#333333' : '#FFFFFF',
   },
   listContainer: {
     paddingHorizontal: 10,
@@ -158,10 +164,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 10,
     elevation: 4,
-    backgroundColor: '#2E2E2E',
+    backgroundColor: isDarkMode ? '#2E2E2E' : '#FFFFFF',
   },
   title: {
-    color: '#FFFFFF',
+    color: isDarkMode ? '#FFFFFF' : '#000000',
     fontWeight: 'bold',
   },
   chipContainer: {
@@ -177,12 +183,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   summary: {
-    color: '#B0B0B0',
+    color: isDarkMode ? '#B0B0B0' : '#505050',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    color: isDarkMode ? '#FFFFFF' : '#000000',
   },
 });
 
