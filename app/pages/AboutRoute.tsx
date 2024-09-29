@@ -1,12 +1,14 @@
+// AboutRoute.tsx
+
 import * as React from 'react';
-import { ScrollView, View, StyleSheet, Text, useColorScheme } from 'react-native';
-import { Avatar, Card, Title, Paragraph, Divider, useTheme } from 'react-native-paper';
+import { ScrollView, View, StyleSheet, Text, Linking, TouchableOpacity } from 'react-native';
+import { Avatar, Card, Title, Paragraph, Divider, useTheme, Button, List, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Animatable from 'react-native-animatable';
 
 const AboutRoute = () => {
   const theme = useTheme();
-  const colorScheme = useColorScheme();
-  const isDarkMode = colorScheme === 'dark';
+  const isDarkMode = theme.dark;
 
   const styles = StyleSheet.create({
     container: {
@@ -18,104 +20,198 @@ const AboutRoute = () => {
       alignItems: 'center',
       marginBottom: 24,
     },
-    card: {
-      margin: 8,
-      padding: 16,
-      backgroundColor: theme.colors.surface,
-      borderRadius: 12, // Rounded corners for a modern look
-      elevation: 2, // Elevation for shadow effect in light mode
-    },
-    link: {
-      color: theme.colors.primary,
+    headerIcon: {
+      marginBottom: 16,
+      marginTop: 20,
     },
     title: {
       color: theme.colors.onBackground,
-      fontSize: 24, // Larger font size for titles
-      fontWeight: '600',
-    },
-    paragraph: {
-      color: theme.colors.onSurface,
-      marginBottom: 12, // Spacing between paragraphs
-      lineHeight: 22,
-    },
-    icon: {
-      alignSelf: 'center',
-      marginBottom: 16,
-      marginTop: 40,
-    },
-    footerText: {
+      fontSize: 28,
+      fontWeight: '700',
       textAlign: 'center',
-      color: theme.colors.onSurface,
-      marginTop: 20,
-      fontSize: 14,
     },
     sectionHeader: {
       color: theme.colors.onBackground,
-      fontSize: 20,
-      fontWeight: '500',
-      marginTop: 16,
+      fontSize: 22,
+      fontWeight: '600',
+      marginTop: 24,
+      marginBottom: 12,
+    },
+    paragraph: {
+      color: theme.colors.onSurface,
+      marginBottom: 12,
+      lineHeight: 22,
+      fontSize: 16,
+    },
+    link: {
+      color: theme.colors.primary,
+      textDecorationLine: 'underline',
+    },
+    iconTextContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 8,
     },
-    avatar: {
-      backgroundColor: theme.colors.primary,
+    icon: {
       marginRight: 8,
+    },
+    card: {
+      marginVertical: 8,
+      borderRadius: 12,
+      elevation: 4,
+      backgroundColor: theme.colors.surface,
+      padding: 16,
+    },
+    footerText: {
+      textAlign: 'center',
+      color: theme.colors.onSurfaceVariant,
+      marginTop: 24,
+      fontSize: 14,
+    },
+    socialIconsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginTop: 16,
+    },
+    socialIconButton: {
+      marginHorizontal: 8,
     },
   });
 
+  // Function to handle link presses
+  const handleLinkPress = async (url: string) => {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      console.warn(`Don't know how to open URI: ${url}`);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.headerContainer}>
+      {/* Header Section */}
+      <Animatable.View animation="fadeInDown" duration={1000} style={styles.headerContainer}>
         <MaterialCommunityIcons
           name="information-outline"
-          size={40} 
+          size={60}
           color={theme.colors.primary}
-          style={styles.icon}
+          style={styles.headerIcon}
         />
         <Title style={styles.title}>About TripSit</Title>
-      </View>
-      
-      <Card style={styles.card}>
-        <Card.Content>
-          <Paragraph style={styles.paragraph}>
-            TripSit is a harm reduction organization that provides factual information about drugs and their effects. Our mission is to promote safe and informed drug use through education and support.
-          </Paragraph>
-          <Divider />
-          <Paragraph style={styles.sectionHeader}>Our Services</Paragraph>
-          <Paragraph style={styles.paragraph}>
-            <MaterialCommunityIcons name="chat" size={20} color={theme.colors.primary} /> Live Chat Support: Get real-time advice and support from our knowledgeable volunteers.
-          </Paragraph>
-          <Paragraph style={styles.paragraph}>
-            <MaterialCommunityIcons name="chemical-weapon" size={20} color={theme.colors.primary} /> Drug Combination Charts: Understand the interactions between different substances.
-          </Paragraph>
-          <Paragraph style={styles.paragraph}>
-            <MaterialCommunityIcons name="book-open-page-variant" size={20} color={theme.colors.primary} /> Substance Information: Detailed information on a wide range of substances.
-          </Paragraph>
-          <Paragraph style={styles.paragraph}>
-            <MaterialCommunityIcons name="account-group" size={20} color={theme.colors.primary} /> Community Forums: Connect with others and share your experiences.
-          </Paragraph>
-          <Divider />
-          <Paragraph style={styles.sectionHeader}>Our Mission</Paragraph>
-          <Paragraph style={styles.paragraph}>
-            Our mission is to reduce the harm associated with drug use by providing accurate information and support. We believe that through education and community, we can help individuals make safer choices.
-          </Paragraph>
-          <Divider />
-          <Paragraph style={styles.sectionHeader}>Contact Us</Paragraph>
-          <Paragraph style={styles.paragraph}>
-            <MaterialCommunityIcons name="email" size={20} color={theme.colors.primary} /> Email: support@tripsit.me
-          </Paragraph>
-          <Paragraph style={styles.paragraph}>
-            <MaterialCommunityIcons name="twitter" size={20} color={theme.colors.primary} /> Twitter: @TripSit
-          </Paragraph>
-          <Paragraph style={styles.paragraph}>
-            <MaterialCommunityIcons name="facebook" size={20} color={theme.colors.primary} /> Facebook: facebook.com/TripSit
-          </Paragraph>
-          <Paragraph style={styles.paragraph}>
-            For more information, visit our website at <Text style={styles.link}>https://tripsit.me</Text>.
-          </Paragraph>
-        </Card.Content>
-      </Card>
-      
-      <Text style={styles.footerText}>Developed by Sympact06</Text>
+      </Animatable.View>
+
+      {/* About TripSit */}
+      <Animatable.View animation="fadeInUp" delay={200} duration={1000}>
+        <Card style={styles.card}>
+          <Card.Content>
+            <Paragraph style={styles.paragraph}>
+              TripSit is a harm reduction organization dedicated to providing factual and unbiased information about various substances. Our mission is to promote safe and informed choices through education, support, and community engagement.
+            </Paragraph>
+            <Divider style={{ marginVertical: 12 }} />
+            
+            {/* Our Services */}
+            <Title style={styles.sectionHeader}>Our Services</Title>
+            <List.Item
+              title="Live Chat Support"
+              description="Get real-time advice and support from our knowledgeable volunteers."
+              left={() => <MaterialCommunityIcons name="chat-processing-outline" size={24} color={theme.colors.primary} />}
+              onPress={() => handleLinkPress('https://tripsit.me/chat')}
+            />
+            <List.Item
+              title="Drug Combination Charts"
+              description="Understand the interactions between different substances."
+              left={() => <MaterialCommunityIcons name="chart-line-stacked" size={24} color={theme.colors.primary} />}
+              onPress={() => handleLinkPress('https://tripsit.me/charts')}
+            />
+            <List.Item
+              title="Substance Information"
+              description="Detailed information on a wide range of substances."
+              left={() => <MaterialCommunityIcons name="book-open-page-variant" size={24} color={theme.colors.primary} />}
+              onPress={() => handleLinkPress('https://tripsit.me/substances')}
+            />
+            <List.Item
+              title="Community Forums"
+              description="Connect with others and share your experiences."
+              left={() => <MaterialCommunityIcons name="account-group-outline" size={24} color={theme.colors.primary} />}
+              onPress={() => handleLinkPress('https://tripsit.me/forums')}
+            />
+            <Divider style={{ marginVertical: 12 }} />
+
+            {/* Our Mission */}
+            <Title style={styles.sectionHeader}>Our Mission</Title>
+            <Paragraph style={styles.paragraph}>
+              Our mission is to reduce the harm associated with substance use by providing accurate information, support, and resources. We believe that through education and community, individuals can make safer and more informed decisions.
+            </Paragraph>
+            <Divider style={{ marginVertical: 12 }} />
+
+            {/* Contact Us */}
+            <Title style={styles.sectionHeader}>Contact Us</Title>
+            <View>
+              <View style={styles.iconTextContainer}>
+                <MaterialCommunityIcons name="email-outline" size={24} color={theme.colors.primary} style={styles.icon} />
+                <TouchableOpacity onPress={() => handleLinkPress('mailto:support@tripsit.me')}>
+                  <Text style={styles.link}>support@tripsit.me</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.iconTextContainer}>
+                <MaterialCommunityIcons name="twitter" size={24} color={theme.colors.primary} style={styles.icon} />
+                <TouchableOpacity onPress={() => handleLinkPress('https://twitter.com/TripSit')}>
+                  <Text style={styles.link}>@TripSit</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.iconTextContainer}>
+                <MaterialCommunityIcons name="facebook" size={24} color={theme.colors.primary} style={styles.icon} />
+                <TouchableOpacity onPress={() => handleLinkPress('https://facebook.com/TripSit')}>
+                  <Text style={styles.link}>facebook.com/TripSit</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.iconTextContainer}>
+                <MaterialCommunityIcons name="web" size={24} color={theme.colors.primary} style={styles.icon} />
+                <TouchableOpacity onPress={() => handleLinkPress('https://tripsit.me')}>
+                  <Text style={styles.link}>https://tripsit.me</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Card.Content>
+        </Card>
+      </Animatable.View>
+
+      {/* Social Media Icons */}
+      <Animatable.View animation="fadeInUp" delay={400} duration={1000}>
+        <View style={styles.socialIconsContainer}>
+          <IconButton
+            icon={() => <MaterialCommunityIcons name="twitter" size={28} color={theme.colors.primary} />}
+            size={36}
+            onPress={() => handleLinkPress('https://twitter.com/TripSit')}
+            style={styles.socialIconButton}
+          />
+          <IconButton
+            icon={() => <MaterialCommunityIcons name="facebook" size={28} color={theme.colors.primary} />}
+            size={36}
+            onPress={() => handleLinkPress('https://facebook.com/TripSit')}
+            style={styles.socialIconButton}
+          />
+          <IconButton
+            icon={() => <MaterialCommunityIcons name="email" size={28} color={theme.colors.primary} />}
+            size={36}
+            onPress={() => handleLinkPress('mailto:support@tripsit.me')}
+            style={styles.socialIconButton}
+          />
+          <IconButton
+            icon={() => <MaterialCommunityIcons name="web" size={28} color={theme.colors.primary} />}
+            size={36}
+            onPress={() => handleLinkPress('https://tripsit.me')}
+            style={styles.socialIconButton}
+          />
+        </View>
+      </Animatable.View>
+
+      {/* Footer */}
+      <Animatable.View animation="fadeInUp" delay={600} duration={1000}>
+        <Text style={styles.footerText}>© {new Date().getFullYear()} TripSit. All rights reserved.</Text>
+        <Text style={styles.footerText}>Developed by Sympact06</Text>
+      </Animatable.View>
     </ScrollView>
   );
 };

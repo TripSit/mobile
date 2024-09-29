@@ -1,38 +1,57 @@
-import * as React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Surface, useTheme } from 'react-native-paper';
+// ChatRoute.tsx
+
+import React from 'react';
+import { StyleSheet, Dimensions } from 'react-native';
+import { useTheme, Surface } from 'react-native-paper';
+import { WebView } from 'react-native-webview';
 
 const ChatRoute = () => {
   const theme = useTheme();
+  const screenHeight = Dimensions.get('window').height;
+
+  // JavaScript to remove all elements except the "root" div
+  const injectedJavaScript = `
+    (function() {
+      var root = document.getElementById('root');
+      if (root) {
+        document.body.innerHTML = '';
+        document.body.appendChild(root);
+      }
+      true; // Note: This is required for the injectedJavaScript to execute properly
+    })();
+  `;
 
   return (
-    <View style={styles.container}>
-      <Surface style={[styles.surface, { backgroundColor: theme.colors.surface }]}>
-        <MaterialCommunityIcons name="chat" size={100} color={theme.colors.primary} />
-        <Text style={[styles.text, { color: theme.colors.onSurface }]}>Coming Soon</Text>
-      </Surface>
-    </View>
+    <Surface style={styles.container}>
+      <WebView
+        source={{ uri: 'https://tripsit.me/webchat' }}
+        style={styles.webview}
+        javaScriptEnabled={true}
+        startInLoadingState={true}
+        injectedJavaScript={injectedJavaScript}
+        // Optionally, handle navigation state changes
+        // onNavigationStateChange={(navState) => { /* Handle navigation changes */ }}
+        // Optionally, handle errors
+        onError={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.warn('WebView error: ', nativeEvent);
+        }}
+        onHttpError={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.warn('WebView HTTP error: ', nativeEvent);
+        }}
+      />
+    </Surface>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    backgroundColor: '#FFFFFF', // Adjust based on theme if necessary
   },
-  surface: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    borderRadius: 12,
-  },
-  text: {
-    fontSize: 24,
-    marginTop: 20,
+  webview: {
+    flex: 1,
   },
 });
 

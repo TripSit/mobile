@@ -23,7 +23,6 @@ export default function HomeScreen() {
   const renderScene = BottomNavigation.SceneMap({
     facts: FactsRoute,
     combos: CombosRoute,
-    wiki: WikiRoute,
     chat: ChatRoute,
     contact: ContactRoute,
     about: AboutRoute,

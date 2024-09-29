@@ -10,8 +10,8 @@ export interface Route extends BottomNavigationRoute {
 export const routes: Route[] = [
   { key: 'facts', title: 'Facts', icon: 'book' },
   { key: 'combos', title: 'Combos', icon: 'flask' },
-  { key: 'wiki', title: 'Wiki', icon: 'earth' },
+ // { key: 'wiki', title: 'Wiki', icon: 'earth' },
   { key: 'chat', title: 'Chat', icon: 'chat' },
-  { key: 'contact', title: 'Contact', icon: 'email' },
+ // { key: 'contact', title: 'Contact', icon: 'email' },
   { key: 'about', title: 'About', icon: 'information' },
 ];
