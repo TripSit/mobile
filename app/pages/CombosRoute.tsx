@@ -536,7 +536,7 @@ const styles = (isDarkMode: boolean) =>
     },
     listContainer: {
       paddingHorizontal: 10,
-      paddingBottom: 100, // Increased padding to accommodate interaction surface
+      paddingBottom: 100, 
     },
     card: {
       marginVertical: 8,
