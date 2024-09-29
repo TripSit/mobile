@@ -13,14 +13,18 @@
       "backgroundColor": "#060606"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.sympact06.TripSit"
+      "package": "com.sympact06.TripSit",
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "bundler": "metro",
@@ -40,6 +44,9 @@
       "eas": {
         "projectId": "8672c25c-0517-4819-bb0a-9bdc33f8596c"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8672c25c-0517-4819-bb0a-9bdc33f8596c"
     }
   }
 }
