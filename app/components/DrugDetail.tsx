@@ -87,9 +87,6 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
   );
 
   useEffect(() => {
-    // For testing purposes, you can replace the fetch call with the provided JSON data
-    // setDrugDetails(yourTestData);
-
     fetch(`https://tripsit.me/api/tripsit/getDrug/${drug.name}`)
       .then(async response => {
         const contentType = response.headers.get('content-type');
@@ -272,7 +269,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
   const chartConfig = {
     backgroundGradientFrom: isDarkMode ? '#121212' : '#FFFFFF',
     backgroundGradientTo: isDarkMode ? '#121212' : '#FFFFFF',
-    color: (opacity = 1) => `rgba(67, 160, 71, ${opacity})`, // Green 600
+    color: (opacity = 1) => `rgba(67, 160, 71, ${opacity})`, 
     labelColor: (opacity = 1) =>
       `rgba(${isDarkMode ? '255, 255, 255' : '0, 0, 0'}, ${opacity})`,
     propsForDots: {
@@ -281,7 +278,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       stroke: '#43A047',
     },
     propsForBackgroundLines: {
-      strokeDasharray: '', // Solid background lines
+      strokeDasharray: '',
       stroke: isDarkMode ? '#333333' : '#EEEEEE',
     },
     decimalPlaces: 0,
@@ -642,12 +639,18 @@ const styles = (isDarkMode: boolean) =>
       marginRight: 6,
       marginBottom: 6,
       backgroundColor: isDarkMode ? '#424242' : '#EEEEEE',
-      height: 28,
+      height: 'auto', 
+      justifyContent: 'center', 
+      paddingHorizontal: 10,
+      paddingVertical: 4,
     },
     chipText: {
       color: isDarkMode ? '#FFFFFF' : '#000000',
-      fontSize: 12,
+      fontSize: 12, 
+      textAlign: 'center', 
+      flexWrap: 'wrap', 
     },
+    
     divider: {
       backgroundColor: isDarkMode ? '#FFFFFF' : '#000000',
       marginVertical: 16,

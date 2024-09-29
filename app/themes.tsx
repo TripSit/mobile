@@ -4,7 +4,7 @@ export const lightTheme = {
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#6750A4',
+    primary: '#6200EE',
     onPrimary: '#FFFFFF',
     primaryContainer: '#EADDFF',
     onPrimaryContainer: '#21005D',
@@ -39,7 +39,7 @@ export const darkTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#D0BCFF',
+    primary: '#6200EE',
     onPrimary: '#381E72',
     primaryContainer: '#4F378B',
     onPrimaryContainer: '#EADDFF',

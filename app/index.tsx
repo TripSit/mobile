@@ -12,6 +12,8 @@ export default function Index() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider theme={theme}>
+        {/* 
+        // @ts-ignore */}
         <HomeScreen theme={theme} />
       </PaperProvider>
     </GestureHandlerRootView>
