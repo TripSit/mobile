@@ -1,4 +1,4 @@
-package com.sympact06.TripSit
+package me.tripsit.mobile
 
 import android.app.Application
 import android.content.res.Configuration

@@ -23,9 +23,14 @@ import {
   Surface,
 } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { useTheme } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DrugDetailScreen from '../components/DrugDetail';
+
+// Import local JSON files
+import localCombosData from '../data/combos.json';
+import localComboDefinitions from '../data/combo_definitions.json';
 
 type Interaction = {
   status: string;
@@ -39,42 +44,58 @@ type CombosData = {
   };
 };
 
-type ComboDefinitions = {
-  [key: string]: string;
+// Update ComboDefinitions type to match the structure of combo_definitions.json
+type ComboDefinition = {
+  status: string;
+  emoji: string;
+  color: string;
+  definition: string;
+  thumbnail: string;
+};
+
+type ComboDefinitions = ComboDefinition[];
+
+// Define DrugDetail type (adjust properties as needed)
+type DrugDetail = {
+  name: string;
+  pretty_name?: string;
+  aliases?: string[];
+  categories?: string[];
+  properties?: {
+    summary?: string;
+  };
+  // Add other properties if needed
 };
 
 type Drug = {
+  id: string;
   name: string;
   pretty_name: string;
+  summary: string;
   aliases: string[];
   categories: string[];
+  details: DrugDetail;
 };
 
-const COMBOS_URL =
-  'https://raw.githubusercontent.com/TripSit/drugs/main/combos.json';
-const COMBO_DEFINITIONS_URL =
-  'https://raw.githubusercontent.com/TripSit/drugs/main/combo_definitions.json';
+const COMBOS_URL = 'https://raw.githubusercontent.com/TripSit/drugs/main/combos.json';
+const COMBO_DEFINITIONS_URL = 'https://raw.githubusercontent.com/TripSit/drugs/main/combo_definitions.json';
 
-const CombosRoute = () => {
+const CombosRoute: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDrugs, setSelectedDrugs] = useState<Drug[]>([]);
   const [combosData, setCombosData] = useState<CombosData>({});
-  const [comboDefinitions, setComboDefinitions] = useState<ComboDefinitions>(
-    {}
-  );
+  const [comboDefinitions, setComboDefinitions] = useState<ComboDefinitions>([]);
   const [drugsList, setDrugsList] = useState<Drug[]>([]);
   const [filteredDrugs, setFilteredDrugs] = useState<Drug[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [interactionResult, setInteractionResult] = useState<Interaction | null>(
-    null
-  );
+  const [interactionResult, setInteractionResult] = useState<Interaction | null>(null);
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
-  const [selectedDrugDetail, setSelectedDrugDetail] = useState<Drug | null>(
-    null
-  );
+  const [selectedDrugDetail, setSelectedDrugDetail] = useState<Drug | null>(null);
   const [snackbarVisible, setSnackbarVisible] = useState<boolean>(false);
   const isDarkMode = useColorScheme() === 'dark';
   const theme = useTheme();
+
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   // Function to capitalize the first letter
   const capitalizeFirstLetter = (string: string) => {
@@ -85,43 +106,96 @@ const CombosRoute = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cachedCombos, cachedDefinitions] = await Promise.all([
+        setLoading(true);
+
+        // Try to load data from AsyncStorage
+        const [cachedCombos, cachedDefinitions, cachedLastUpdated] = await Promise.all([
           AsyncStorage.getItem('combos'),
           AsyncStorage.getItem('combo_definitions'),
+          AsyncStorage.getItem('lastUpdatedCombos'),
         ]);
 
         if (cachedCombos && cachedDefinitions) {
           setCombosData(JSON.parse(cachedCombos));
           setComboDefinitions(JSON.parse(cachedDefinitions));
+          setLastUpdated(cachedLastUpdated);
+        } else {
+          // Load data from local JSON files
+          setCombosData(localCombosData);
+          setComboDefinitions(localComboDefinitions);
+          setLastUpdated(null);
         }
 
-        const [combosResponse, definitionsResponse] = await Promise.all([
-          fetch(COMBOS_URL),
-          fetch(COMBO_DEFINITIONS_URL),
-        ]);
-
-        const combosJson = await combosResponse.json();
-        const definitionsJson = await definitionsResponse.json();
-
-        setCombosData(combosJson);
-        setComboDefinitions(definitionsJson);
-
-        await AsyncStorage.setItem('combos', JSON.stringify(combosJson));
-        await AsyncStorage.setItem(
-          'combo_definitions',
-          JSON.stringify(definitionsJson)
-        );
-
         // Generate drugs list
-        const drugs = Object.keys(combosJson).map((drugName) => ({
+        const drugs = Object.keys(localCombosData).map((drugName, index) => ({
+          id: `${index}`,
           name: drugName,
           pretty_name: capitalizeFirstLetter(drugName),
+          summary: '', // Provide a default summary or fetch it if available
           aliases: [],
           categories: [], // Populate if available
+          details: {
+            name: drugName,
+            pretty_name: capitalizeFirstLetter(drugName),
+            aliases: [],
+            categories: [],
+            properties: {
+              summary: '', // Provide actual summary if available
+            },
+          },
         }));
 
         setDrugsList(drugs);
         setFilteredDrugs(drugs);
+
+        // Check internet connectivity
+        NetInfo.fetch().then(async (state) => {
+          if (state.isConnected) {
+            // Fetch data from URLs
+            const [combosResponse, definitionsResponse] = await Promise.all([
+              fetch(COMBOS_URL),
+              fetch(COMBO_DEFINITIONS_URL),
+            ]);
+
+            const combosJson = await combosResponse.json();
+            const definitionsJson: ComboDefinitions = await definitionsResponse.json();
+
+            setCombosData(combosJson);
+            setComboDefinitions(definitionsJson);
+
+            await AsyncStorage.setItem('combos', JSON.stringify(combosJson));
+            await AsyncStorage.setItem('combo_definitions', JSON.stringify(definitionsJson));
+
+            // Update last updated time
+            const currentTime = new Date().toISOString();
+            await AsyncStorage.setItem('lastUpdatedCombos', currentTime);
+            setLastUpdated(currentTime);
+
+            // Generate updated drugs list
+            const updatedDrugs = Object.keys(combosJson).map((drugName, index) => ({
+              id: `${index}`,
+              name: drugName,
+              pretty_name: capitalizeFirstLetter(drugName),
+              summary: '', // Provide actual summary if available
+              aliases: [],
+              categories: [], // Populate if available
+              details: {
+                name: drugName,
+                pretty_name: capitalizeFirstLetter(drugName),
+                aliases: [],
+                categories: [],
+                properties: {
+                  summary: '', // Provide actual summary if available
+                },
+              },
+            }));
+
+            setDrugsList(updatedDrugs);
+            setFilteredDrugs(updatedDrugs);
+          } else {
+            console.log('No internet connection');
+          }
+        });
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -142,9 +216,7 @@ const CombosRoute = () => {
 
   const toggleDrugSelection = (drug: Drug) => {
     if (selectedDrugs.find((d) => d.name === drug.name)) {
-      setSelectedDrugs((prevSelected) =>
-        prevSelected.filter((d) => d.name !== drug.name)
-      );
+      setSelectedDrugs((prevSelected) => prevSelected.filter((d) => d.name !== drug.name));
     } else if (selectedDrugs.length < 2) {
       setSelectedDrugs((prevSelected) => [...prevSelected, drug]);
     } else {
@@ -156,8 +228,7 @@ const CombosRoute = () => {
     if (selectedDrugs.length === 2) {
       const [drug1, drug2] = selectedDrugs;
       const interaction =
-        combosData[drug1.name]?.[drug2.name] ||
-        combosData[drug2.name]?.[drug1.name];
+        combosData[drug1.name]?.[drug2.name] || combosData[drug2.name]?.[drug1.name];
 
       setInteractionResult(interaction || null);
     } else {
@@ -245,8 +316,7 @@ const CombosRoute = () => {
       }).start();
     };
 
-    const iconName =
-      categoryIcons[item.categories[0]?.toLowerCase()] || 'pill';
+    const iconName = categoryIcons[item.categories[0]?.toLowerCase()] || 'pill';
 
     return (
       <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
@@ -291,21 +361,12 @@ const CombosRoute = () => {
         <Surface style={styles(isDarkMode).interactionSurface}>
           <TouchableOpacity onPress={() => setIsModalVisible(true)}>
             <View style={styles(isDarkMode).interactionContainer}>
-              <MaterialCommunityIcons
-                name={statusIcon}
-                size={32}
-                color={statusColor}
-              />
+              <MaterialCommunityIcons name={statusIcon} size={32} color={statusColor} />
               <View style={styles(isDarkMode).interactionTextContainer}>
                 <Text style={styles(isDarkMode).interactionTitle}>
                   {drug1.pretty_name} + {drug2.pretty_name}
                 </Text>
-                <Text
-                  style={[
-                    styles(isDarkMode).interactionStatus,
-                    { color: statusColor },
-                  ]}
-                >
+                <Text style={[styles(isDarkMode).interactionStatus, { color: statusColor }]}>
                   {status}
                 </Text>
               </View>
@@ -323,11 +384,7 @@ const CombosRoute = () => {
         <Surface style={styles(isDarkMode).interactionSurface}>
           <TouchableOpacity onPress={() => setIsModalVisible(true)}>
             <View style={styles(isDarkMode).interactionContainer}>
-              <MaterialCommunityIcons
-                name="help-circle-outline"
-                size={32}
-                color="#9E9E9E"
-              />
+              <MaterialCommunityIcons name="help-circle-outline" size={32} color="#9E9E9E" />
               <View style={styles(isDarkMode).interactionTextContainer}>
                 <Text style={styles(isDarkMode).interactionTitle}>
                   {selectedDrugs[0].pretty_name} + {selectedDrugs[1].pretty_name}
@@ -355,8 +412,10 @@ const CombosRoute = () => {
       const [drug1, drug2] = selectedDrugs;
       const status = interactionResult.status;
       const statusColor = getStatusColor(status);
-      const definition =
-        comboDefinitions[status] || 'No definition available for this status.';
+      const definitionObj = comboDefinitions.find(
+        (def) => def.status.toLowerCase() === status.toLowerCase()
+      );
+      const definition = definitionObj ? definitionObj.definition : 'No definition available for this status.';
       const note = interactionResult.note;
 
       return (
@@ -370,35 +429,23 @@ const CombosRoute = () => {
         >
           <Appbar.Header style={styles(isDarkMode).modalHeader}>
             <Appbar.BackAction onPress={() => setIsModalVisible(false)} />
-            <Appbar.Content
-              title={`${drug1.pretty_name} + ${drug2.pretty_name}`}
-            />
+            <Appbar.Content title={`${drug1.pretty_name} + ${drug2.pretty_name}`} />
           </Appbar.Header>
           <ScrollView contentContainerStyle={styles(isDarkMode).modalContent}>
             <View style={styles(isDarkMode).statusContainer}>
-              <MaterialCommunityIcons
-                name={getStatusIcon(status)}
-                size={48}
-                color={statusColor}
-              />
-              <Text
-                style={[
-                  styles(isDarkMode).modalStatusText,
-                  { color: statusColor },
-                ]}
-              >
+              <MaterialCommunityIcons name={getStatusIcon(status)} size={48} color={statusColor} />
+              <Text style={[styles(isDarkMode).modalStatusText, { color: statusColor }]}>
                 {status}
               </Text>
             </View>
-            {note && (
-              <Text style={styles(isDarkMode).modalNoteText}>{note}</Text>
-            )}
-            <Text style={styles(isDarkMode).modalDefinitionText}>
-              {definition}
-            </Text>
+            {note && <Text style={styles(isDarkMode).modalNoteText}>{note}</Text>}
+            <Text style={styles(isDarkMode).modalDefinitionText}>{definition}</Text>
             <Button
               mode="contained"
-              onPress={() => setSelectedDrugs([])}
+              onPress={() => {
+                setSelectedDrugs([]);
+                setIsModalVisible(false);
+              }}
               style={styles(isDarkMode).clearButton}
             >
               Clear Selection
@@ -419,23 +466,12 @@ const CombosRoute = () => {
         >
           <Appbar.Header style={styles(isDarkMode).modalHeader}>
             <Appbar.BackAction onPress={() => setIsModalVisible(false)} />
-            <Appbar.Content
-              title={`${drug1.pretty_name} + ${drug2.pretty_name}`}
-            />
+            <Appbar.Content title={`${drug1.pretty_name} + ${drug2.pretty_name}`} />
           </Appbar.Header>
           <ScrollView contentContainerStyle={styles(isDarkMode).modalContent}>
             <View style={styles(isDarkMode).statusContainer}>
-              <MaterialCommunityIcons
-                name="help-circle-outline"
-                size={48}
-                color="#9E9E9E"
-              />
-              <Text
-                style={[
-                  styles(isDarkMode).modalStatusText,
-                  { color: '#9E9E9E' },
-                ]}
-              >
+              <MaterialCommunityIcons name="help-circle-outline" size={48} color="#9E9E9E" />
+              <Text style={[styles(isDarkMode).modalStatusText, { color: '#9E9E9E' }]}>
                 No interaction data available
               </Text>
             </View>
@@ -444,7 +480,10 @@ const CombosRoute = () => {
             </Text>
             <Button
               mode="contained"
-              onPress={() => setSelectedDrugs([])}
+              onPress={() => {
+                setSelectedDrugs([]);
+                setIsModalVisible(false);
+              }}
               style={styles(isDarkMode).clearButton}
             >
               Clear Selection
@@ -482,7 +521,7 @@ const CombosRoute = () => {
       />
       <FlatList
         data={filteredDrugs}
-        keyExtractor={(item) => item.name}
+        keyExtractor={(item) => item.id}
         renderItem={renderDrug}
         contentContainerStyle={styles(isDarkMode).listContainer}
       />
@@ -499,10 +538,7 @@ const CombosRoute = () => {
         >
           {selectedDrugDetail && (
             <View style={{ flex: 1 }}>
-              <DrugDetailScreen
-                drug={selectedDrugDetail}
-                onClose={() => setSelectedDrugDetail(null)}
-              />
+              <DrugDetailScreen drug={selectedDrugDetail} onClose={() => setSelectedDrugDetail(null)} />
             </View>
           )}
         </Modal>
@@ -536,7 +572,7 @@ const styles = (isDarkMode: boolean) =>
     },
     listContainer: {
       paddingHorizontal: 10,
-      paddingBottom: 100, 
+      paddingBottom: 100,
     },
     card: {
       marginVertical: 8,

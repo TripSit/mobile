@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   StyleSheet,
-  ActivityIndicator,
   BackHandler,
   useColorScheme,
   Dimensions,
@@ -37,7 +36,7 @@ type Combo = {
 
 type DrugDetail = {
   name: string;
-  pretty_name: string;
+  pretty_name?: string;
   aliases?: string[];
   categories?: string[];
   combos?: { [key: string]: Combo };
@@ -59,16 +58,25 @@ type DrugDetail = {
   sources?: { _general?: string[] };
 };
 
+type Drug = {
+  id: string;
+  name: string;
+  summary: string;
+  categories: string[];
+  aliases: string[];
+  details: DrugDetail; // Specify the type for 'details'
+};
+
 type DrugDetailScreenProps = {
-  drug: { name: string };
+  drug: Drug;
   onClose: () => void;
 };
 
 const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) => {
-  const [drugDetails, setDrugDetails] = useState<DrugDetail | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const isDarkMode = useColorScheme() === 'dark';
+
+  // Use the drug details directly
+  const drugDetails = drug.details;
 
   // Handle Back Button
   useFocusEffect(
@@ -85,33 +93,6 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       };
     }, [onClose])
   );
-
-  useEffect(() => {
-    fetch(`https://tripsit.me/api/tripsit/getDrug/${drug.name}`)
-      .then(async response => {
-        const contentType = response.headers.get('content-type');
-
-        if (contentType && contentType.includes('application/json')) {
-          const result = await response.json();
-          if (result && result.data && result.data.length > 0 && !result.data[0].err) {
-            setDrugDetails(result.data[0]);
-          } else {
-            setError('This substance does not have more information in our database.');
-          }
-        } else {
-          const text = await response.text();
-          console.error('Expected JSON, but received:', text);
-          setError('Failed to load substance details. The server returned an unexpected response.');
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching substance details:', error);
-        setError('Failed to load substance details.');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [drug.name]);
 
   // Parse duration strings into minutes
   const parseDuration = (duration: string | undefined): number => {
@@ -284,41 +265,6 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
     decimalPlaces: 0,
   };
 
-  if (loading) {
-    return (
-      <View style={styles(isDarkMode).loadingContainer}>
-        <ActivityIndicator size="large" color="#43A047" />
-        <Text style={{ color: isDarkMode ? '#FFFFFF' : '#000000', marginTop: 10 }}>
-          Loading...
-        </Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles(isDarkMode).container}>
-        <Text
-          style={{
-            color: isDarkMode ? '#FFFFFF' : '#000000',
-            textAlign: 'center',
-            marginTop: 20,
-          }}
-        >
-          {error}
-        </Text>
-        <TouchableOpacity style={styles(isDarkMode).closeButton} onPress={onClose}>
-          <MaterialCommunityIcons
-            name="close-circle-outline"
-            size={48}
-            color={isDarkMode ? '#FFFFFF' : '#000000'}
-          />
-          <Text style={styles(isDarkMode).closeButtonText}>Close</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   if (!drugDetails) {
     return (
       <View style={styles(isDarkMode).container}>
@@ -356,7 +302,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
         />
 
         {/* Title */}
-        <Text style={styles(isDarkMode).title}>{drugDetails.pretty_name}</Text>
+        <Text style={styles(isDarkMode).title}>{drugDetails.pretty_name || drug.name}</Text>
 
         {/* Categories and Aliases */}
         <View style={styles(isDarkMode).section}>
@@ -365,7 +311,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
             <>
               <Text style={styles(isDarkMode).sectionTitle}>Categories</Text>
               <View style={styles(isDarkMode).chipContainer}>
-                {drugDetails.categories.map((category, index) => (
+                {drugDetails.categories.map((category: string, index: number) => (
                   <Chip
                     key={index}
                     style={[
@@ -386,7 +332,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
             <>
               <Text style={styles(isDarkMode).sectionTitle}>Aliases</Text>
               <View style={styles(isDarkMode).chipContainer}>
-                {drugDetails.aliases.map((alias, index) => (
+                {drugDetails.aliases.map((alias: string, index: number) => (
                   <Chip
                     key={index}
                     style={[styles(isDarkMode).chip]}
@@ -417,7 +363,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
           <View style={styles(isDarkMode).section}>
             <Text style={styles(isDarkMode).sectionTitle}>Common Effects</Text>
             <View style={styles(isDarkMode).chipContainer}>
-              {drugDetails.formatted_effects.map((effect, index) => (
+              {drugDetails.formatted_effects.map((effect: string, index: number) => (
                 <Chip
                   key={index}
                   style={[styles(isDarkMode).chip]}
@@ -475,7 +421,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
                     <DataTable.Title>Strength</DataTable.Title>
                     <DataTable.Title numeric>Amount</DataTable.Title>
                   </DataTable.Header>
-                  {Object.entries(doses).map(([strength, amount]) =>
+                  {Object.entries(doses as { [key: string]: string }).map(([strength, amount]) =>
                     renderDosageRow(strength, amount)
                   )}
                 </DataTable>
@@ -521,7 +467,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
                 {details.sources && details.sources.length > 0 && (
                   <View style={styles(isDarkMode).sourcesSection}>
                     <Text style={styles(isDarkMode).sourcesTitle}>Sources:</Text>
-                    {details.sources.map((source, idx) => (
+                    {details.sources.map((source: any, idx: number) => (
                       <TouchableOpacity
                         key={idx}
                         onPress={() => Linking.openURL(source.url)}
@@ -561,7 +507,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
         {drugDetails.sources && drugDetails.sources._general && (
           <View style={styles(isDarkMode).section}>
             <Text style={styles(isDarkMode).sectionTitle}>General Sources</Text>
-            {drugDetails.sources._general.map((source, index) => (
+            {drugDetails.sources._general.map((source: string, index: number) => (
               <TouchableOpacity
                 key={index}
                 onPress={() => {
@@ -592,12 +538,6 @@ const styles = (isDarkMode: boolean) =>
     scrollContainer: {
       padding: 16,
       paddingBottom: 30,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: isDarkMode ? '#121212' : '#FFFFFF',
     },
     closeIcon: {
       position: 'absolute',
@@ -650,7 +590,6 @@ const styles = (isDarkMode: boolean) =>
       textAlign: 'center', 
       flexWrap: 'wrap', 
     },
-    
     divider: {
       backgroundColor: isDarkMode ? '#FFFFFF' : '#000000',
       marginVertical: 16,
