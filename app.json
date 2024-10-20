@@ -20,13 +20,13 @@
       "bundleIdentifier": "me.tripsit.mobile"
     },
     "android": {
-      "versionCode": 20,
+      "versionCode": 21,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "me.tripsit.mobile",
-      "runtimeVersion": "12.0.0"
+      "runtimeVersion": "12.0.1"
     },
     "web": {
       "bundler": "metro",
