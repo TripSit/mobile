@@ -1,4 +1,6 @@
-import * as React from 'react';
+// FactsRoute.tsx
+
+import React, { useState, useEffect } from 'react';
 import {
   View,
   FlatList,
@@ -7,7 +9,6 @@ import {
   TouchableOpacity,
   useColorScheme,
 } from 'react-native';
-import { useState, useEffect } from 'react';
 import {
   Searchbar,
   Card,
@@ -16,12 +17,49 @@ import {
   Avatar,
   Text,
   Chip,
-  Button,
-  Modal,
   Checkbox,
   Portal,
+  Modal,
+  Button,
 } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import localDrugData from '../data/drugs.json';
 import DrugDetailScreen from '../components/DrugDetail';
+
+type Combo = {
+  status: string;
+  note?: string;
+  sources?: {
+    author: string;
+    title: string;
+    url: string;
+  }[];
+};
+
+type DrugDetail = {
+  name: string;
+  pretty_name?: string;
+  aliases?: string[];
+  categories?: string[];
+  combos?: { [key: string]: Combo };
+  dose_note?: string;
+  formatted_aftereffects?: { _unit: string; value: string };
+  formatted_dose?: { [key: string]: { [key: string]: string } };
+  formatted_duration?: { _unit: string; value: string };
+  formatted_effects?: string[];
+  formatted_onset?: { _unit: string; value: string };
+  links?: { experiences?: string; tihkal?: string };
+  properties?: {
+    summary?: string;
+    after_effects?: string;
+    avoid?: string;
+    half_life?: string;
+    marquis?: string;
+  };
+  pweffects?: { [key: string]: string };
+  sources?: { _general?: string[] };
+};
 
 type Drug = {
   id: string;
@@ -29,7 +67,9 @@ type Drug = {
   summary: string;
   categories: string[];
   aliases: string[];
-};
+  details: DrugDetail; 
+}
+
 
 const FactsRoute: React.FC = () => {
   const [data, setData] = useState<Drug[]>([]);
@@ -47,39 +87,123 @@ const FactsRoute: React.FC = () => {
   const [page, setPage] = useState<number>(1);
 
   useEffect(() => {
-    fetch('https://tripsit.me/api/tripsit/getalldrugs')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(result => {
-        if (result && result.data) {
-          const drugs: Drug[] = result.data.flatMap((drugObject: any, index: number) => {
-            return Object.keys(drugObject).map((drugName, innerIndex) => {
-              const drugDetails = drugObject[drugName];
-              return {
-                id: `${index}-${innerIndex}`,
-                name: drugDetails.pretty_name || drugName,
-                summary: drugDetails.properties?.summary || 'No summary available.',
-                categories: drugDetails.categories || ['Uncategorized'],
-                aliases: drugDetails.aliases || [],
-              };
+    let isMounted = true;
+
+    const parseDrugData = (data: any): Drug[] => {
+      const drugs: Drug[] = [];
+
+      if (Array.isArray(data)) {
+        // Data from API
+        data.forEach((drugObject: any, index: number) => {
+          Object.keys(drugObject).forEach((drugName, innerIndex) => {
+            const drugDetails = drugObject[drugName];
+            drugs.push({
+              id: `${index}-${innerIndex}`,
+              name: drugDetails.pretty_name || drugName,
+              summary: drugDetails.properties?.summary || 'No summary available.',
+              categories: drugDetails.categories || ['Uncategorized'],
+              aliases: drugDetails.aliases || [],
+              details: drugDetails, // Store full details
             });
           });
+        });
+      } else if (typeof data === 'object') {
+        // Data from local JSON
+        Object.keys(data).forEach((drugName, index) => {
+          const drugDetails = data[drugName];
+          drugs.push({
+            id: `${index}`,
+            name: drugDetails.pretty_name || drugName,
+            summary: drugDetails.properties?.summary || 'No summary available.',
+            categories: drugDetails.categories || ['Uncategorized'],
+            aliases: drugDetails.aliases || [],
+            details: drugDetails, // Store full details
+          });
+        });
+      }
 
-          setData(drugs);
-          setFilteredData(drugs);
-          setDisplayedData(drugs.slice(0, ITEMS_PER_PAGE));
+      return drugs;
+    };
+
+    const loadData = async () => {
+      try {
+        setLoading(true);
+
+        // Try to get data from AsyncStorage
+        const storedData = await AsyncStorage.getItem('drugData');
+        if (storedData) {
+          const parsedData = JSON.parse(storedData);
+          if (isMounted) {
+            setData(parsedData);
+            setFilteredData(parsedData);
+            setDisplayedData(parsedData.slice(0, ITEMS_PER_PAGE));
+            setLoading(false);
+          }
+        } else {
+          // If no data in AsyncStorage, load from local JSON
+          if (localDrugData) {
+            const parsedData = parseDrugData(localDrugData);
+            if (isMounted) {
+              setData(parsedData);
+              setFilteredData(parsedData);
+              setDisplayedData(parsedData.slice(0, ITEMS_PER_PAGE));
+              setLoading(false);
+            }
+          } else {
+            // If no local data, show error
+            if (isMounted) {
+              setLoading(false);
+              console.error('No data available');
+            }
+          }
         }
-      })
-      .catch(error => {
-        console.error('Error fetching data:', error);
-      })
-      .finally(() => {
+
+        // Check internet connectivity
+        NetInfo.fetch().then(state => {
+          if (state.isConnected) {
+            // Fetch data from API
+            fetch('https://tripsit.me/api/tripsit/getalldrugs')
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+              })
+              .then(result => {
+                if (result && result.data) {
+                  const drugs = parseDrugData(result.data);
+
+                  if (isMounted) {
+                    setData(drugs);
+                    setFilteredData(drugs);
+                    setDisplayedData(drugs.slice(0, ITEMS_PER_PAGE));
+                  }
+
+                  // Save data to AsyncStorage
+                  AsyncStorage.setItem('drugData', JSON.stringify(drugs)).catch(error => {
+                    console.error('Error saving data to AsyncStorage:', error);
+                  });
+                }
+              })
+              .catch(error => {
+                console.error('Error fetching data from API:', error);
+              });
+          } else {
+            // Not connected
+            console.log('No internet connection');
+          }
+        });
+      } catch (error) {
+        console.error('Error loading data:', error);
         setLoading(false);
-      });
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleSearch = (query: string) => {

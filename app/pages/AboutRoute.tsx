@@ -1,14 +1,31 @@
-// AboutRoute.tsx
-
-import * as React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, View, StyleSheet, Text, Linking, TouchableOpacity } from 'react-native';
 import { Avatar, Card, Title, Paragraph, Divider, useTheme, Button, List, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import moment from 'moment'; 
 
 const AboutRoute = () => {
   const theme = useTheme();
   const isDarkMode = theme.dark;
+
+  const [lastUpdatedDrugs, setLastUpdatedDrugs] = useState<string | null>(null);
+  const [lastUpdatedCombos, setLastUpdatedCombos] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLastUpdated = async () => {
+      const [drugsUpdated, combosUpdated] = await Promise.all([
+        AsyncStorage.getItem('lastUpdatedDrugs'),
+        AsyncStorage.getItem('lastUpdatedCombos'),
+      ]);
+
+      setLastUpdatedDrugs(drugsUpdated);
+      setLastUpdatedCombos(combosUpdated);
+    };
+
+    fetchLastUpdated();
+  }, []);
 
   const styles = StyleSheet.create({
     container: {
@@ -88,6 +105,11 @@ const AboutRoute = () => {
     }
   };
 
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Unknown';
+    return moment(dateString).format('MMMM Do YYYY, h:mm:ss a');
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* Header Section */}
@@ -105,6 +127,16 @@ const AboutRoute = () => {
       <Animatable.View animation="fadeInUp" delay={200} duration={1000}>
         <Card style={styles.card}>
           <Card.Content>
+            {/* Last Updated Information */}
+            <Title style={styles.sectionHeader}>Data Last Updated</Title>
+            <Paragraph style={styles.paragraph}>
+              Substances Data: {formatDate(lastUpdatedDrugs)}
+            </Paragraph>
+            <Paragraph style={styles.paragraph}>
+              Combinations Data: {formatDate(lastUpdatedCombos)}
+            </Paragraph>
+            <Divider style={{ marginVertical: 12 }} />
+
             <Paragraph style={styles.paragraph}>
               TripSit is a harm reduction organization dedicated to providing factual and unbiased information about various substances. Our mission is to promote safe and informed choices through education, support, and community engagement.
             </Paragraph>
