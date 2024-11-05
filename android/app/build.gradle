@@ -114,7 +114,7 @@ android {
         applicationId 'me.tripsit.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 21
+        versionCode 22
         versionName "12.0.0"
     }
     signingConfigs {
