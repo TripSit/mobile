@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   BackHandler,
-  useColorScheme,
   Dimensions,
   Linking,
   ScrollView,
@@ -11,7 +10,6 @@ import {
 } from 'react-native';
 import {
   Chip,
-  IconButton,
   Divider,
   Text,
   Paragraph,
@@ -90,13 +88,10 @@ type DrugDetailScreenProps = {
   onClose: () => void;
 };
 
-const AnimatedCard = Animated.createAnimatedComponent(Card);
 const AnimatedSurface = Animated.createAnimatedComponent(Surface);
 
 const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) => {
-  const isDarkMode = useColorScheme() === 'dark';
   const theme = useTheme();
-  const paperTheme = theme;
   
   const headerOpacity = useSharedValue(0);
   const contentOpacity = useSharedValue(0);
@@ -104,44 +99,45 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
 
   const drugDetails = drug.details;
 
-  const headerAnimationStyle = useAnimatedStyle(() => {
-    return {
-      opacity: headerOpacity.value,
-      transform: [{ translateY: slideIn.value }]
-    };
-  });
+  const headerAnimationStyle = useAnimatedStyle(() => ({
+    opacity: headerOpacity.value,
+    transform: [{ translateY: slideIn.value }]
+  }));
 
-  const contentAnimationStyle = useAnimatedStyle(() => {
-    return {
-      opacity: contentOpacity.value,
-    };
-  });
+  const contentAnimationStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+  }));
 
   useEffect(() => {
-    headerOpacity.value = withTiming(1, { duration: 600 });
-    slideIn.value = withSpring(0, { damping: 12 });
-    
-    setTimeout(() => {
-      contentOpacity.value = withTiming(1, { duration: 800 });
-    }, 300);
-  }, []);
+    const animateIn = () => {
+      headerOpacity.value = withTiming(1, { duration: 600 });
+      slideIn.value = withSpring(0, { damping: 12 });
+      
+      setTimeout(() => {
+        contentOpacity.value = withTiming(1, { duration: 800 });
+      }, 300);
+    };
+
+    animateIn();
+  }, [headerOpacity, slideIn, contentOpacity]);
 
   useEffect(() => {
     const onBackPress = () => {
-      headerOpacity.value = withTiming(0, { duration: 300 });
-      contentOpacity.value = withTiming(0, { duration: 300 });
-      slideIn.value = withTiming(-100, { duration: 300 }, () => {
-        runOnJS(onClose)();
-      });
+      const animateOut = async () => {
+        headerOpacity.value = withTiming(0, { duration: 300 });
+        contentOpacity.value = withTiming(0, { duration: 300 });
+        slideIn.value = withTiming(-100, { duration: 300 }, () => {
+          runOnJS(onClose)();
+        });
+      };
+
+      animateOut();
       return true;
     };
 
     BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-    return () => {
-      BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-    };
-  }, [onClose]);
+    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  }, [onClose, headerOpacity, contentOpacity, slideIn]);
 
   const parseDuration = (duration: string | undefined): number => {
     if (!duration) return 0;
