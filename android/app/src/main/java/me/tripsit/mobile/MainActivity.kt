@@ -1,5 +1,5 @@
-import expo.modules.splashscreen.SplashScreenManager
 package me.tripsit.mobile
+import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
 import android.os.Bundle

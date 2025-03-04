@@ -20,7 +20,7 @@
       "bundleIdentifier": "me.tripsit.mobile"
     },
     "android": {
-      "versionCode": 24,
+      "versionCode": 25,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
