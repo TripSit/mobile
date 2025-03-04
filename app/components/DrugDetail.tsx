@@ -210,7 +210,8 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       datasets: [
         {
           data: intensities,
-          color: (opacity = 1) => theme.colors.primary + (opacity !== 1 ? opacity * 255 : ''), 
+          color: (opacity = 1) => 
+            theme.colors.primary + (opacity !== 1 ? Math.round(opacity * 255).toString(16) : ''),
           strokeWidth: 2,
         },
       ],
@@ -353,9 +354,9 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
             <View style={styles(theme).section}>
               <Text variant="labelLarge" style={styles(theme).sectionLabel}>Categories</Text>
               <View style={styles(theme).chipContainer}>
-                {drugDetails.categories.map((category: string, index: number) => (
+                {drugDetails.categories.map((category: string, _index: number) => (
                   <Chip
-                    key={index}
+                    key={_index}
                     style={[
                       styles(theme).chip,
                       { backgroundColor: getCategoryColor(category) }
@@ -439,11 +440,16 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
               <Card style={styles(theme).card} mode="elevated">
                 <Card.Content>
                   <Title style={styles(theme).cardTitle}>Effect Timeline</Title>
+                  {/* @ts-expect-error LineChart from react-native-chart-kit has incomplete TypeScript definitions */}
                   <LineChart
                     data={chartData}
                     width={screenWidth - 48}
                     height={220}
-                    chartConfig={chartConfig}
+                    chartConfig={{
+                      ...chartConfig,
+                      color: (opacity = 1) => 
+                        theme.colors.primary + (opacity !== 1 ? Math.round(opacity * 255).toString(16) : '')
+                    }}
                     bezier
                     style={styles(theme).chartStyle}
                     withInnerLines={false}
@@ -545,7 +551,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
                       {details.sources && details.sources.length > 0 && (
                         <View style={styles(theme).sourcesSection}>
                           <Text style={styles(theme).sourcesTitle}>Sources:</Text>
-                          {details.sources.map((source: any, idx: number) => (
+                          {details.sources.map((source: Source, idx: number) => (
                             <TouchableOpacity
                               key={idx}
                               onPress={() => Linking.openURL(source.url)}
@@ -570,22 +576,22 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
               <Card style={styles(theme).card} mode="elevated">
                 <Card.Content>
                   <Title style={styles(theme).cardTitle}>External Links</Title>
-                  {drugDetails.links.experiences && (
+                  {drugDetails.links?.experiences && (
                     <Tooltip title="View Erowid Experience Vault">
                       <TouchableOpacity
                         style={styles(theme).linkButton}
-                        onPress={() => Linking.openURL(drugDetails.links!.experiences!)}
+                        onPress={() => Linking.openURL(drugDetails.links?.experiences ?? '')}
                       >
                         <MaterialCommunityIcons name="earth" size={24} color={theme.colors.primary} />
                         <Text style={styles(theme).linkText}>Erowid Experiences</Text>
                       </TouchableOpacity>
                     </Tooltip>
                   )}
-                  {drugDetails.links.tihkal && (
+                  {drugDetails.links?.tihkal && (
                     <Tooltip title="View TIHKAL Entry">
                       <TouchableOpacity 
                         style={styles(theme).linkButton}
-                        onPress={() => Linking.openURL(drugDetails.links!.tihkal!)}
+                        onPress={() => Linking.openURL(drugDetails.links?.tihkal ?? '')}
                       >
                         <MaterialCommunityIcons name="book-open-variant" size={24} color={theme.colors.primary} />
                         <Text style={styles(theme).linkText}>TIHKAL</Text>

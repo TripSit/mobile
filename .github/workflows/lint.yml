@@ -31,7 +31,7 @@ jobs:
           npm install -g expo-cli @expo/cli
 
       - name: Run Expo Lint
-        run: npx eslint . --max-warnings=0  # Faal alleen bij errors, niet bij warnings
+        run: npx eslint . --max-warnings=0  
 
       - name: Generate SARIF report
         run: npx eslint . --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif

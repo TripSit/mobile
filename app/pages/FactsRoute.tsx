@@ -70,6 +70,47 @@ type Drug = {
   details: DrugDetail; 
 }
 
+// Add type definitions for API responses
+type ApiDrugObject = {
+  [key: string]: DrugDetail;
+};
+
+type ApiResponse = ApiDrugObject[];
+
+// Separate functions to reduce complexity
+const parseApiDrug = (drugName: string, drugDetails: DrugDetail, index: number, innerIndex: number): Drug => ({
+  id: `${index}-${innerIndex}`,
+  name: drugDetails.pretty_name || drugName,
+  summary: drugDetails.properties?.summary || 'No summary available.',
+  categories: drugDetails.categories || ['Uncategorized'],
+  aliases: drugDetails.aliases || [],
+  details: drugDetails,
+});
+
+const parseLocalDrug = (drugName: string, drugDetails: DrugDetail, index: number): Drug => ({
+  id: `${index}`,
+  name: drugDetails.pretty_name || drugName,
+  summary: drugDetails.properties?.summary || 'No summary available.',
+  categories: drugDetails.categories || ['Uncategorized'],
+  aliases: drugDetails.aliases || [],
+  details: drugDetails,
+});
+
+const parseApiData = (data: ApiResponse): Drug[] => {
+  const drugs: Drug[] = [];
+  data.forEach((drugObject, index) => {
+    Object.entries(drugObject).forEach(([drugName, drugDetails], innerIndex) => {
+      drugs.push(parseApiDrug(drugName, drugDetails, index, innerIndex));
+    });
+  });
+  return drugs;
+};
+
+const parseLocalData = (data: Record<string, DrugDetail>): Drug[] => {
+  return Object.entries(data).map(([drugName, drugDetails], index) => 
+    parseLocalDrug(drugName, drugDetails, index)
+  );
+};
 
 const FactsRoute: React.FC = () => {
   const [data, setData] = useState<Drug[]>([]);
@@ -89,40 +130,8 @@ const FactsRoute: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
 
-    const parseDrugData = (data: any): Drug[] => {
-      const drugs: Drug[] = [];
-
-      if (Array.isArray(data)) {
-        // Data from API
-        data.forEach((drugObject: any, index: number) => {
-          Object.keys(drugObject).forEach((drugName, innerIndex) => {
-            const drugDetails = drugObject[drugName];
-            drugs.push({
-              id: `${index}-${innerIndex}`,
-              name: drugDetails.pretty_name || drugName,
-              summary: drugDetails.properties?.summary || 'No summary available.',
-              categories: drugDetails.categories || ['Uncategorized'],
-              aliases: drugDetails.aliases || [],
-              details: drugDetails, // Store full details
-            });
-          });
-        });
-      } else if (typeof data === 'object') {
-        // Data from local JSON
-        Object.keys(data).forEach((drugName, index) => {
-          const drugDetails = data[drugName];
-          drugs.push({
-            id: `${index}`,
-            name: drugDetails.pretty_name || drugName,
-            summary: drugDetails.properties?.summary || 'No summary available.',
-            categories: drugDetails.categories || ['Uncategorized'],
-            aliases: drugDetails.aliases || [],
-            details: drugDetails, // Store full details
-          });
-        });
-      }
-
-      return drugs;
+    const parseDrugData = (data: ApiResponse | Record<string, DrugDetail>): Drug[] => {
+      return Array.isArray(data) ? parseApiData(data) : parseLocalData(data);
     };
 
     const loadData = async () => {
