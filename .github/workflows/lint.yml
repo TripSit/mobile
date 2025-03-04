@@ -2,9 +2,9 @@ name: ESLint
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - '**'  
   pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -31,12 +31,10 @@ jobs:
           npm install -g expo-cli @expo/cli
 
       - name: Run Expo Lint
-        run: npx expo lint
-        continue-on-error: true
+        run: npx eslint . --max-warnings=0  # Faal alleen bij errors, niet bij warnings
 
       - name: Generate SARIF report
         run: npx eslint . --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif
-        continue-on-error: true
 
       - name: Upload analysis results
         uses: github/codeql-action/upload-sarif@v3
