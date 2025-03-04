@@ -26,7 +26,8 @@ jobs:
         run: npm ci
 
       - name: Run ESLint
-        run: npx eslint . --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif
+        run: |
+          npx expo lint --output-file eslint-results.sarif --format @microsoft/eslint-formatter-sarif
         continue-on-error: true
 
       - name: Upload ESLint analysis results
