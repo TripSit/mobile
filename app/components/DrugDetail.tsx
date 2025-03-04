@@ -1,27 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  ActivityIndicator,
   BackHandler,
-  useColorScheme,
   Dimensions,
   Linking,
   ScrollView,
-  Text,
   TouchableOpacity, 
 } from 'react-native';
 import {
   Chip,
-  IconButton,
   Divider,
+  Text,
   Paragraph,
   DataTable,
   Surface,
+  useTheme,
+  Card,
+  Title,
+  MD3Colors,
+  ActivityIndicator,
+  Appbar,
+  Tooltip,
+  Avatar,
+  AnimatedFAB,
 } from 'react-native-paper';
 import { LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import * as Animatable from 'react-native-animatable';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+  FadeIn,
+  SlideInRight,
+} from 'react-native-reanimated';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -37,7 +52,7 @@ type Combo = {
 
 type DrugDetail = {
   name: string;
-  pretty_name: string;
+  pretty_name?: string;
   aliases?: string[];
   categories?: string[];
   combos?: { [key: string]: Combo };
@@ -59,61 +74,71 @@ type DrugDetail = {
   sources?: { _general?: string[] };
 };
 
+type Drug = {
+  id: string;
+  name: string;
+  summary: string;
+  categories: string[];
+  aliases: string[];
+  details: DrugDetail;
+};
+
 type DrugDetailScreenProps = {
-  drug: { name: string };
+  drug: Drug;
   onClose: () => void;
 };
 
+const AnimatedSurface = Animated.createAnimatedComponent(Surface);
+
 const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) => {
-  const [drugDetails, setDrugDetails] = useState<DrugDetail | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const isDarkMode = useColorScheme() === 'dark';
+  const theme = useTheme();
+  
+  const headerOpacity = useSharedValue(0);
+  const contentOpacity = useSharedValue(0);
+  const slideIn = useSharedValue(-100);
 
-  // Handle Back Button
-  useFocusEffect(
-    React.useCallback(() => {
-      const onBackPress = () => {
-        onClose();
-        return true;
-      };
+  const drugDetails = drug.details;
 
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+  const headerAnimationStyle = useAnimatedStyle(() => ({
+    opacity: headerOpacity.value,
+    transform: [{ translateY: slideIn.value }]
+  }));
 
-      return () => {
-        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-      };
-    }, [onClose])
-  );
+  const contentAnimationStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+  }));
 
   useEffect(() => {
-    fetch(`https://tripsit.me/api/tripsit/getDrug/${drug.name}`)
-      .then(async response => {
-        const contentType = response.headers.get('content-type');
+    const animateIn = () => {
+      headerOpacity.value = withTiming(1, { duration: 600 });
+      slideIn.value = withSpring(0, { damping: 12 });
+      
+      setTimeout(() => {
+        contentOpacity.value = withTiming(1, { duration: 800 });
+      }, 300);
+    };
 
-        if (contentType && contentType.includes('application/json')) {
-          const result = await response.json();
-          if (result && result.data && result.data.length > 0 && !result.data[0].err) {
-            setDrugDetails(result.data[0]);
-          } else {
-            setError('This substance does not have more information in our database.');
-          }
-        } else {
-          const text = await response.text();
-          console.error('Expected JSON, but received:', text);
-          setError('Failed to load substance details. The server returned an unexpected response.');
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching substance details:', error);
-        setError('Failed to load substance details.');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [drug.name]);
+    animateIn();
+  }, [headerOpacity, slideIn, contentOpacity]);
 
-  // Parse duration strings into minutes
+  useEffect(() => {
+    const onBackPress = () => {
+      const animateOut = async () => {
+        headerOpacity.value = withTiming(0, { duration: 300 });
+        contentOpacity.value = withTiming(0, { duration: 300 });
+        slideIn.value = withTiming(-100, { duration: 300 }, () => {
+          runOnJS(onClose)();
+        });
+      };
+
+      animateOut();
+      return true;
+    };
+
+    BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  }, [onClose, headerOpacity, contentOpacity, slideIn]);
+
   const parseDuration = (duration: string | undefined): number => {
     if (!duration) return 0;
 
@@ -142,9 +167,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       })
       .reduce((a, b) => a + b, 0);
 
-    const avgMinutes = totalMinutes / ranges.length;
-
-    return avgMinutes;
+    return totalMinutes / ranges.length;
   };
 
   const generateChartData = () => {
@@ -160,7 +183,6 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
 
     const totalDuration = onsetMinutes + durationMinutes + aftereffectsMinutes;
 
-    // Check for invalid durations
     if (totalDuration === 0) return null;
 
     const dataPoints = [
@@ -188,7 +210,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       datasets: [
         {
           data: intensities,
-          color: (opacity = 1) => `rgba(67, 160, 71, ${opacity})`, // Green 600
+          color: (opacity = 1) => theme.colors.primary + (opacity !== 1 ? opacity * 255 : ''), 
           strokeWidth: 2,
         },
       ],
@@ -199,28 +221,28 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
 
   const getCategoryColor = (category: string) => {
     const categoryColors: { [key: string]: string } = {
-      psychedelic: '#6200EE',
-      stimulant: '#D32F2F',
-      depressant: '#303F9F',
-      opioid: '#7B1FA2',
-      cannabinoid: '#388E3C',
-      dissociative: '#1976D2',
-      deliriant: '#5D4037',
-      'nootropic': '#0288D1',
-      'research chemical': '#455A64',
-      'antidepressant': '#FBC02D',
-      'antipsychotic': '#616161',
-      'benzodiazepine': '#00796B',
-      'ssri': '#C2185B',
-      'maoi': '#AFB42B',
-      'vitamin': '#F57C00',
-      'entactogen': '#E64A19',
-      'alcohol': '#F4511E',
-      'gabaergic': '#512DA8',
-      'steroid': '#0097A7',
-      'unclassified': '#9E9E9E',
-      'habit-forming': '#E53935',
-      default: '#9E9E9E',
+      psychedelic: theme.colors.tertiary,
+      stimulant: theme.colors.error,
+      depressant: theme.colors.primary,
+      opioid: theme.colors.secondary,
+      cannabinoid: theme.colors.primaryContainer,
+      dissociative: theme.colors.secondaryContainer,
+      deliriant: theme.colors.tertiaryContainer,
+      'nootropic': theme.colors.surfaceVariant,
+      'research chemical': theme.colors.outline,
+      'antidepressant': theme.colors.onSurfaceVariant,
+      'antipsychotic': theme.colors.inverseSurface,
+      'benzodiazepine': theme.colors.onSecondary,
+      'ssri': theme.colors.onTertiary,
+      'maoi': theme.colors.onPrimaryContainer,
+      'vitamin': theme.colors.onSecondaryContainer,
+      'entactogen': theme.colors.onTertiaryContainer,
+      'alcohol': theme.colors.onError,
+      'gabaergic': theme.colors.onErrorContainer,
+      'steroid': theme.colors.inversePrimary,
+      'unclassified': theme.colors.outline,
+      'habit-forming': theme.colors.error,
+      default: theme.colors.surfaceVariant,
     };
 
     return categoryColors[category.toLowerCase()] || categoryColors['default'];
@@ -244,18 +266,19 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
   };
 
   const getComboColor = (status: string | undefined) => {
-    if (!status) return '#9E9E9E';
+    if (!status) return theme.colors.outline;
+    
     switch (status.toLowerCase()) {
       case 'low risk & synergy':
       case 'low risk & decrease':
-        return '#43A047'; // Green 600
+        return theme.colors.primary;
       case 'caution':
-        return '#FB8C00'; // Orange 600
+        return MD3Colors.orange700;
       case 'unsafe':
       case 'dangerous':
-        return '#E53935'; // Red 600
+        return theme.colors.error;
       default:
-        return '#9E9E9E'; // Gray
+        return theme.colors.outline;
     }
   };
 
@@ -267,348 +290,368 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
   );
 
   const chartConfig = {
-    backgroundGradientFrom: isDarkMode ? '#121212' : '#FFFFFF',
-    backgroundGradientTo: isDarkMode ? '#121212' : '#FFFFFF',
-    color: (opacity = 1) => `rgba(67, 160, 71, ${opacity})`, 
-    labelColor: (opacity = 1) =>
-      `rgba(${isDarkMode ? '255, 255, 255' : '0, 0, 0'}, ${opacity})`,
+    backgroundGradientFrom: theme.colors.surface,
+    backgroundGradientTo: theme.colors.surface,
+    color: (opacity = 1) => theme.colors.primary + (opacity !== 1 ? opacity * 255 : ''),
+    labelColor: (opacity = 1) => theme.colors.onSurface,
     propsForDots: {
       r: '4',
       strokeWidth: '2',
-      stroke: '#43A047',
+      stroke: theme.colors.primary,
     },
     propsForBackgroundLines: {
       strokeDasharray: '',
-      stroke: isDarkMode ? '#333333' : '#EEEEEE',
+      stroke: theme.dark ? theme.colors.surfaceDisabled : theme.colors.surfaceVariant,
     },
     decimalPlaces: 0,
   };
 
-  if (loading) {
-    return (
-      <View style={styles(isDarkMode).loadingContainer}>
-        <ActivityIndicator size="large" color="#43A047" />
-        <Text style={{ color: isDarkMode ? '#FFFFFF' : '#000000', marginTop: 10 }}>
-          Loading...
-        </Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles(isDarkMode).container}>
-        <Text
-          style={{
-            color: isDarkMode ? '#FFFFFF' : '#000000',
-            textAlign: 'center',
-            marginTop: 20,
-          }}
-        >
-          {error}
-        </Text>
-        <TouchableOpacity style={styles(isDarkMode).closeButton} onPress={onClose}>
-          <MaterialCommunityIcons
-            name="close-circle-outline"
-            size={48}
-            color={isDarkMode ? '#FFFFFF' : '#000000'}
-          />
-          <Text style={styles(isDarkMode).closeButtonText}>Close</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   if (!drugDetails) {
     return (
-      <View style={styles(isDarkMode).container}>
-        <Text
-          style={{
-            color: isDarkMode ? '#FFFFFF' : '#000000',
-            textAlign: 'center',
-            marginTop: 20,
-          }}
-        >
+      <Animated.View 
+        style={[
+          styles(theme).container, 
+          { justifyContent: 'center', alignItems: 'center' }
+        ]}
+        entering={FadeIn.duration(500)}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text variant="titleMedium" style={{ marginTop: 20 }}>
           Substance details not available.
         </Text>
-        <TouchableOpacity style={styles(isDarkMode).closeButton} onPress={onClose}>
-          <MaterialCommunityIcons
-            name="close-circle-outline"
-            size={48}
-            color={isDarkMode ? '#FFFFFF' : '#000000'}
-          />
-          <Text style={styles(isDarkMode).closeButtonText}>Close</Text>
-        </TouchableOpacity>
-      </View>
+        <AnimatedFAB
+          icon="close"
+          label="Close"
+          onPress={onClose}
+          style={styles(theme).fab}
+          extended={true}
+          variant="surface"
+          color={theme.colors.onSurface}
+          rippleColor={theme.colors.primaryContainer}
+          animateFrom='right'
+          iconMode='dynamic'
+        />
+      </Animated.View>
     );
   }
 
   return (
-    <View style={styles(isDarkMode).container}>
-      <ScrollView contentContainerStyle={styles(isDarkMode).scrollContainer}>
-        {/* Close Button */}
-        <IconButton
-          icon="close"
-          size={28}
-          onPress={onClose}
-          style={styles(isDarkMode).closeIcon}
-          animated
+    <View style={styles(theme).container}>
+      <Appbar.Header style={styles(theme).appBar} elevated>
+        <Appbar.BackAction onPress={onClose} />
+        <Appbar.Content 
+          title={drugDetails.pretty_name || drug.name} 
+          titleStyle={styles(theme).appBarTitle}
         />
-
-        {/* Title */}
-        <Text style={styles(isDarkMode).title}>{drugDetails.pretty_name}</Text>
-
-        {/* Categories and Aliases */}
-        <View style={styles(isDarkMode).section}>
+      </Appbar.Header>
+      
+      <ScrollView contentContainerStyle={styles(theme).scrollContainer}>
+        {/* Header Section with Categories and Aliases */}
+        <Animated.View style={[styles(theme).headerSection, headerAnimationStyle]}>
           {/* Categories */}
           {drugDetails.categories && drugDetails.categories.length > 0 && (
-            <>
-              <Text style={styles(isDarkMode).sectionTitle}>Categories</Text>
-              <View style={styles(isDarkMode).chipContainer}>
-                {drugDetails.categories.map((category, index) => (
+            <View style={styles(theme).section}>
+              <Text variant="labelLarge" style={styles(theme).sectionLabel}>Categories</Text>
+              <View style={styles(theme).chipContainer}>
+                {drugDetails.categories.map((category: string, index: number) => (
                   <Chip
                     key={index}
                     style={[
-                      styles(isDarkMode).chip,
-                      { backgroundColor: getCategoryColor(category) },
+                      styles(theme).chip,
+                      { backgroundColor: getCategoryColor(category) }
                     ]}
-                    textStyle={styles(isDarkMode).chipText}
+                    textStyle={styles(theme).chipText}
+                    mode="flat"
+                    elevation={1}
                   >
                     {category}
                   </Chip>
                 ))}
               </View>
-            </>
+            </View>
           )}
 
           {/* Aliases */}
           {drugDetails.aliases && drugDetails.aliases.length > 0 && (
-            <>
-              <Text style={styles(isDarkMode).sectionTitle}>Aliases</Text>
-              <View style={styles(isDarkMode).chipContainer}>
-                {drugDetails.aliases.map((alias, index) => (
+            <View style={styles(theme).section}>
+              <Text variant="labelLarge" style={styles(theme).sectionLabel}>Aliases</Text>
+              <View style={styles(theme).chipContainer}>
+                {drugDetails.aliases.map((alias: string, index: number) => (
                   <Chip
                     key={index}
-                    style={[styles(isDarkMode).chip]}
-                    textStyle={styles(isDarkMode).chipText}
+                    style={styles(theme).chip}
+                    textStyle={styles(theme).chipText}
+                    mode="outlined"
                   >
                     {alias}
                   </Chip>
                 ))}
               </View>
-            </>
+            </View>
           )}
-        </View>
+        </Animated.View>
 
-        <Divider style={styles(isDarkMode).divider} />
+        <Divider style={styles(theme).divider} />
 
-        {/* Summary */}
-        {drugDetails.properties?.summary && (
-          <View style={styles(isDarkMode).section}>
-            <Text style={styles(isDarkMode).sectionTitle}>Summary</Text>
-            <Paragraph style={styles(isDarkMode).paragraph}>
-              {drugDetails.properties.summary}
-            </Paragraph>
-          </View>
-        )}
+        {/* Main Content */}
+        <Animated.View style={[contentAnimationStyle]}>
+          {/* Summary */}
+          {drugDetails.properties?.summary && (
+            <Animatable.View animation="fadeIn" duration={800} delay={300}>
+              <Card style={styles(theme).card} mode="elevated">
+                <Card.Content>
+                  <Title style={styles(theme).cardTitle}>Summary</Title>
+                  <Paragraph style={styles(theme).paragraph}>
+                    {drugDetails.properties.summary}
+                  </Paragraph>
+                </Card.Content>
+              </Card>
+            </Animatable.View>
+          )}
 
-        {/* Effects */}
-        {drugDetails.formatted_effects && drugDetails.formatted_effects.length > 0 && (
-          <View style={styles(isDarkMode).section}>
-            <Text style={styles(isDarkMode).sectionTitle}>Common Effects</Text>
-            <View style={styles(isDarkMode).chipContainer}>
-              {drugDetails.formatted_effects.map((effect, index) => (
-                <Chip
-                  key={index}
-                  style={[styles(isDarkMode).chip]}
-                  textStyle={styles(isDarkMode).chipText}
-                >
-                  {effect}
-                </Chip>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Effect Intensity Chart */}
-        {chartData && (
-          <View style={styles(isDarkMode).section}>
-            <Text style={styles(isDarkMode).sectionTitle}>Effect Intensity Over Time</Text>
-            <LineChart
-              data={chartData}
-              width={screenWidth - 32}
-              height={220}
-              chartConfig={chartConfig}
-              bezier
-              style={styles(isDarkMode).chartStyle}
-              withInnerLines={false}
-              yAxisLabel=""
-              yAxisSuffix="%"
-              yAxisInterval={25}
-            />
-            <View style={styles(isDarkMode).durationInfo}>
-              <Text style={styles(isDarkMode).durationText}>
-                Onset: {drugDetails.formatted_onset?.value ?? 'Unknown'}{' '}
-                {drugDetails.formatted_onset?._unit ?? ''}
-              </Text>
-              <Text style={styles(isDarkMode).durationText}>
-                Duration: {drugDetails.formatted_duration?.value ?? 'Unknown'}{' '}
-                {drugDetails.formatted_duration?._unit ?? ''}
-              </Text>
-              <Text style={styles(isDarkMode).durationText}>
-                After effects: {drugDetails.formatted_aftereffects?.value ?? 'Unknown'}{' '}
-                {drugDetails.formatted_aftereffects?._unit ?? ''}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Doses */}
-        {drugDetails.formatted_dose && Object.keys(drugDetails.formatted_dose).length > 0 && (
-          <View style={styles(isDarkMode).section}>
-            <Text style={styles(isDarkMode).sectionTitle}>Dosage</Text>
-            {Object.entries(drugDetails.formatted_dose).map(([roa, doses]) => (
-              <View key={roa} style={styles(isDarkMode).doseSection}>
-                <Text style={styles(isDarkMode).subSectionTitle}>{roa}</Text>
-                <DataTable>
-                  <DataTable.Header>
-                    <DataTable.Title>Strength</DataTable.Title>
-                    <DataTable.Title numeric>Amount</DataTable.Title>
-                  </DataTable.Header>
-                  {Object.entries(doses).map(([strength, amount]) =>
-                    renderDosageRow(strength, amount)
-                  )}
-                </DataTable>
-              </View>
-            ))}
-            {drugDetails.dose_note && (
-              <Paragraph style={styles(isDarkMode).paragraph}>
-                {drugDetails.dose_note}
-              </Paragraph>
-            )}
-          </View>
-        )}
-
-        {/* Combos */}
-        {drugDetails.combos && Object.keys(drugDetails.combos).length > 0 && (
-          <View style={styles(isDarkMode).section}>
-            <Text style={styles(isDarkMode).sectionTitle}>Combinations</Text>
-            {Object.entries(drugDetails.combos).map(([comboDrug, details], index) => (
-              <Surface
-                key={index}
-                style={[
-                  styles(isDarkMode).comboCard,
-                  { borderLeftColor: getComboColor(details.status) },
-                ]}
-              >
-                <View style={styles(isDarkMode).comboHeader}>
-                  <MaterialCommunityIcons
-                    name={getComboIcon(details.status)}
-                    size={20}
-                    color={getComboColor(details.status)}
-                    style={styles(isDarkMode).comboIcon}
-                  />
-                  <Text style={styles(isDarkMode).comboDrugName}>
-                    {comboDrug.toUpperCase()}
-                  </Text>
-                </View>
-                <Text style={styles(isDarkMode).comboStatus}>
-                  Status: <Text style={{ fontWeight: 'bold' }}>{details.status}</Text>
-                </Text>
-                {details.note && (
-                  <Text style={styles(isDarkMode).comboNote}>Note: {details.note}</Text>
-                )}
-                {details.sources && details.sources.length > 0 && (
-                  <View style={styles(isDarkMode).sourcesSection}>
-                    <Text style={styles(isDarkMode).sourcesTitle}>Sources:</Text>
-                    {details.sources.map((source, idx) => (
-                      <TouchableOpacity
-                        key={idx}
-                        onPress={() => Linking.openURL(source.url)}
+          {/* Effects */}
+          {drugDetails.formatted_effects && drugDetails.formatted_effects.length > 0 && (
+            <Animatable.View animation="fadeIn" duration={800} delay={400}>
+              <Card style={styles(theme).card} mode="elevated">
+                <Card.Content>
+                  <Title style={styles(theme).cardTitle}>Common Effects</Title>
+                  <View style={styles(theme).chipContainer}>
+                    {drugDetails.formatted_effects.map((effect: string, index: number) => (
+                      <Chip
+                        key={index}
+                        style={styles(theme).effectChip}
+                        textStyle={styles(theme).chipText}
+                        mode="outlined"
+                        icon="star-outline"
                       >
-                        <Text style={styles(isDarkMode).sourceLink}>
-                          - {source.author}: {source.title}
-                        </Text>
-                      </TouchableOpacity>
+                        {effect}
+                      </Chip>
                     ))}
                   </View>
-                )}
-              </Surface>
-            ))}
-          </View>
-        )}
+                </Card.Content>
+              </Card>
+            </Animatable.View>
+          )}
 
-        {/* External Links */}
-        {drugDetails.links && (
-          <View style={styles(isDarkMode).section}>
-            <Text style={styles(isDarkMode).sectionTitle}>External Links</Text>
-            {drugDetails.links.experiences && (
-              <TouchableOpacity
-                onPress={() => Linking.openURL(drugDetails.links!.experiences!)}
-              >
-                <Text style={styles(isDarkMode).linkText}>Erowid Experiences</Text>
-              </TouchableOpacity>
-            )}
-            {drugDetails.links.tihkal && (
-              <TouchableOpacity onPress={() => Linking.openURL(drugDetails.links!.tihkal!)}>
-                <Text style={styles(isDarkMode).linkText}>TIHKAL</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+          {/* Effect Intensity Chart */}
+          {chartData && (
+            <Animatable.View animation="fadeIn" duration={800} delay={500}>
+              <Card style={styles(theme).card} mode="elevated">
+                <Card.Content>
+                  <Title style={styles(theme).cardTitle}>Effect Timeline</Title>
+                  <LineChart
+                    data={chartData}
+                    width={screenWidth - 48}
+                    height={220}
+                    chartConfig={chartConfig}
+                    bezier
+                    style={styles(theme).chartStyle}
+                    withInnerLines={false}
+                    yAxisLabel=""
+                    yAxisSuffix="%"
+                    yAxisInterval={25}
+                  />
+                  <View style={styles(theme).durationInfo}>
+                    <View style={styles(theme).durationItem}>
+                      <Avatar.Icon size={24} icon="timer-outline" style={styles(theme).durationIcon} />
+                      <Text variant="bodyMedium">
+                        <Text style={{fontWeight: 'bold'}}>Onset:</Text> {drugDetails.formatted_onset?.value ?? 'Unknown'}{' '}
+                        {drugDetails.formatted_onset?._unit ?? ''}
+                      </Text>
+                    </View>
+                    <View style={styles(theme).durationItem}>
+                      <Avatar.Icon size={24} icon="clock-outline" style={styles(theme).durationIcon} />
+                      <Text variant="bodyMedium">
+                        <Text style={{fontWeight: 'bold'}}>Duration:</Text> {drugDetails.formatted_duration?.value ?? 'Unknown'}{' '}
+                        {drugDetails.formatted_duration?._unit ?? ''}
+                      </Text>
+                    </View>
+                    <View style={styles(theme).durationItem}>
+                      <Avatar.Icon size={24} icon="clock-time-four-outline" style={styles(theme).durationIcon} />
+                      <Text variant="bodyMedium">
+                        <Text style={{fontWeight: 'bold'}}>After effects:</Text> {drugDetails.formatted_aftereffects?.value ?? 'Unknown'}{' '}
+                        {drugDetails.formatted_aftereffects?._unit ?? ''}
+                      </Text>
+                    </View>
+                  </View>
+                </Card.Content>
+              </Card>
+            </Animatable.View>
+          )}
 
-        {/* General Sources */}
-        {drugDetails.sources && drugDetails.sources._general && (
-          <View style={styles(isDarkMode).section}>
-            <Text style={styles(isDarkMode).sectionTitle}>General Sources</Text>
-            {drugDetails.sources._general.map((source, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => {
-                  const urlMatch = source.match(/\bhttps?:\/\/\S+/gi);
-                  if (urlMatch && urlMatch[0]) {
-                    Linking.openURL(urlMatch[0]);
-                  }
-                }}
-              >
-                <Text style={styles(isDarkMode).sourceLink}>- {source}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+          {/* Doses */}
+          {drugDetails.formatted_dose && Object.keys(drugDetails.formatted_dose).length > 0 && (
+            <Animatable.View animation="fadeIn" duration={800} delay={600}>
+              <Card style={styles(theme).card} mode="elevated">
+                <Card.Content>
+                  <Title style={styles(theme).cardTitle}>Dosage</Title>
+                  {Object.entries(drugDetails.formatted_dose).map(([roa, doses], index) => (
+                    <View key={roa} style={styles(theme).doseSection}>
+                      <Text variant="titleMedium" style={styles(theme).subSectionTitle}>{roa}</Text>
+                      <DataTable>
+                        <DataTable.Header>
+                          <DataTable.Title>Strength</DataTable.Title>
+                          <DataTable.Title numeric>Amount</DataTable.Title>
+                        </DataTable.Header>
+                        {Object.entries(doses as { [key: string]: string }).map(([strength, amount]) =>
+                          renderDosageRow(strength, amount)
+                        )}
+                      </DataTable>
+                    </View>
+                  ))}
+                  {drugDetails.dose_note && (
+                    <Paragraph style={styles(theme).paragraph}>
+                      {drugDetails.dose_note}
+                    </Paragraph>
+                  )}
+                </Card.Content>
+              </Card>
+            </Animatable.View>
+          )}
 
-        <View style={{ height: 30 }} />
+          {/* Combos */}
+          {drugDetails.combos && Object.keys(drugDetails.combos).length > 0 && (
+            <Animatable.View animation="fadeIn" duration={800} delay={700}>
+              <Card style={styles(theme).card} mode="elevated">
+                <Card.Content>
+                  <Title style={styles(theme).cardTitle}>Combinations</Title>
+                  {Object.entries(drugDetails.combos).map(([comboDrug, details], index) => (
+                    <AnimatedSurface
+                      key={index}
+                      style={[
+                        styles(theme).comboCard,
+                        { borderLeftColor: getComboColor(details.status) }
+                      ]}
+                      elevation={1}
+                      entering={SlideInRight.delay(100 * index).springify()}
+                    >
+                      <View style={styles(theme).comboHeader}>
+                        <Avatar.Icon 
+                          size={32} 
+                          icon={getComboIcon(details.status)}
+                          color={getComboColor(details.status)}
+                          style={styles(theme).comboIcon} 
+                        />
+                        <Text variant="titleMedium" style={styles(theme).comboDrugName}>
+                          {comboDrug.toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles(theme).comboStatus}>
+                        Status: <Text style={{ fontWeight: 'bold' }}>{details.status}</Text>
+                      </Text>
+                      {details.note && (
+                        <Text style={styles(theme).comboNote}>Note: {details.note}</Text>
+                      )}
+                      {details.sources && details.sources.length > 0 && (
+                        <View style={styles(theme).sourcesSection}>
+                          <Text style={styles(theme).sourcesTitle}>Sources:</Text>
+                          {details.sources.map((source: any, idx: number) => (
+                            <TouchableOpacity
+                              key={idx}
+                              onPress={() => Linking.openURL(source.url)}
+                            >
+                              <Text style={styles(theme).sourceLink}>
+                                - {source.author}: {source.title}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </AnimatedSurface>
+                  ))}
+                </Card.Content>
+              </Card>
+            </Animatable.View>
+          )}
+
+          {/* External Links */}
+          {drugDetails.links && (
+            <Animatable.View animation="fadeIn" duration={800} delay={800}>
+              <Card style={styles(theme).card} mode="elevated">
+                <Card.Content>
+                  <Title style={styles(theme).cardTitle}>External Links</Title>
+                  {drugDetails.links.experiences && (
+                    <Tooltip title="View Erowid Experience Vault">
+                      <TouchableOpacity
+                        style={styles(theme).linkButton}
+                        onPress={() => Linking.openURL(drugDetails.links!.experiences!)}
+                      >
+                        <MaterialCommunityIcons name="earth" size={24} color={theme.colors.primary} />
+                        <Text style={styles(theme).linkText}>Erowid Experiences</Text>
+                      </TouchableOpacity>
+                    </Tooltip>
+                  )}
+                  {drugDetails.links.tihkal && (
+                    <Tooltip title="View TIHKAL Entry">
+                      <TouchableOpacity 
+                        style={styles(theme).linkButton}
+                        onPress={() => Linking.openURL(drugDetails.links!.tihkal!)}
+                      >
+                        <MaterialCommunityIcons name="book-open-variant" size={24} color={theme.colors.primary} />
+                        <Text style={styles(theme).linkText}>TIHKAL</Text>
+                      </TouchableOpacity>
+                    </Tooltip>
+                  )}
+                </Card.Content>
+              </Card>
+            </Animatable.View>
+          )}
+
+          {/* General Sources */}
+          {drugDetails.sources && drugDetails.sources._general && (
+            <Animatable.View animation="fadeIn" duration={800} delay={900}>
+              <Card style={styles(theme).card} mode="elevated">
+                <Card.Content>
+                  <Title style={styles(theme).cardTitle}>General Sources</Title>
+                  {drugDetails.sources._general.map((source: string, index: number) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => {
+                        const urlMatch = source.match(/\bhttps?:\/\/\S+/gi);
+                        if (urlMatch && urlMatch[0]) {
+                          Linking.openURL(urlMatch[0]);
+                        }
+                      }}
+                    >
+                      <Text style={styles(theme).sourceLink}>- {source}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </Card.Content>
+              </Card>
+            </Animatable.View>
+          )}
+
+          <View style={{ height: 30 }} />
+        </Animated.View>
       </ScrollView>
     </View>
   );
 };
 
-const styles = (isDarkMode: boolean) =>
+const styles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: isDarkMode ? '#121212' : '#FFFFFF',
+      backgroundColor: theme.colors.background,
+    },
+    appBar: {
+      backgroundColor: theme.colors.surface,
+    },
+    appBarTitle: {
+      fontWeight: 'bold',
+      color: theme.colors.onSurface,
     },
     scrollContainer: {
       padding: 16,
       paddingBottom: 30,
     },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: isDarkMode ? '#121212' : '#FFFFFF',
-    },
-    closeIcon: {
-      position: 'absolute',
-      top: 16,
-      right: 16,
-      zIndex: 1,
+    headerSection: {
+      marginBottom: 10,
     },
     title: {
       fontSize: 28,
       fontWeight: 'bold',
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       marginBottom: 16,
       textAlign: 'center',
       marginTop: 16,
@@ -616,69 +659,102 @@ const styles = (isDarkMode: boolean) =>
     section: {
       marginBottom: 16,
     },
+    sectionLabel: {
+      color: theme.colors.secondary,
+      marginBottom: 8,
+      fontWeight: '500',
+    },
     sectionTitle: {
       fontSize: 18,
       fontWeight: 'bold',
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       marginBottom: 8,
+    },
+    cardTitle: {
+      color: theme.colors.onSurface,
+      marginBottom: 12,
     },
     subSectionTitle: {
       fontSize: 16,
       fontWeight: '600',
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       marginTop: 8,
       marginBottom: 4,
     },
     chipContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      justifyContent: 'center',
+      justifyContent: 'flex-start',
       marginBottom: 8,
     },
     chip: {
       marginRight: 6,
       marginBottom: 6,
-      backgroundColor: isDarkMode ? '#424242' : '#EEEEEE',
+      backgroundColor: theme.colors.surfaceVariant,
       height: 'auto', 
       justifyContent: 'center', 
       paddingHorizontal: 10,
       paddingVertical: 4,
     },
+    effectChip: {
+      marginRight: 6,
+      marginBottom: 6,
+      height: 'auto',
+      justifyContent: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
     chipText: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       fontSize: 12, 
       textAlign: 'center', 
       flexWrap: 'wrap', 
     },
-    
     divider: {
-      backgroundColor: isDarkMode ? '#FFFFFF' : '#000000',
+      backgroundColor: theme.colors.outline,
       marginVertical: 16,
+      height: 0.5,
+    },
+    card: {
+      marginVertical: 8,
+      borderRadius: 12,
+      backgroundColor: theme.colors.surface,
+      overflow: 'hidden',
     },
     paragraph: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       fontSize: 14,
       lineHeight: 20,
     },
     chartStyle: {
       marginVertical: 8,
+      borderRadius: 8,
     },
     durationInfo: {
-      marginTop: 8,
+      marginTop: 12,
+    },
+    durationItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    durationIcon: {
+      backgroundColor: theme.colors.surfaceVariant,
+      marginRight: 8,
     },
     durationText: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       fontSize: 12,
     },
     doseSection: {
       marginTop: 8,
     },
     comboCard: {
-      backgroundColor: isDarkMode ? '#1E1E1E' : '#F5F5F5',
+      backgroundColor: theme.colors.surfaceVariant,
       marginBottom: 12,
       padding: 12,
       borderLeftWidth: 4,
-      elevation: 2,
+      borderRadius: 8,
     },
     comboHeader: {
       flexDirection: 'row',
@@ -686,20 +762,21 @@ const styles = (isDarkMode: boolean) =>
       marginBottom: 4,
     },
     comboIcon: {
-      marginRight: 4,
+      backgroundColor: 'transparent',
+      marginRight: 8,
     },
     comboDrugName: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       fontSize: 16,
       fontWeight: 'bold',
     },
     comboStatus: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       fontSize: 14,
       marginBottom: 4,
     },
     comboNote: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurfaceVariant,
       fontSize: 12,
       fontStyle: 'italic',
     },
@@ -707,29 +784,40 @@ const styles = (isDarkMode: boolean) =>
       marginTop: 8,
     },
     sourcesTitle: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       fontSize: 14,
       marginBottom: 4,
     },
     sourceLink: {
-      color: '#1E88E5',
-      fontSize: 12,
+      color: theme.colors.primary,
+      fontSize: 13,
       marginLeft: 8,
       marginBottom: 2,
     },
+    linkButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
     linkText: {
-      color: '#1E88E5',
+      color: theme.colors.primary,
       fontSize: 14,
-      marginBottom: 4,
+      marginLeft: 8,
     },
     closeButton: {
       alignItems: 'center',
       marginTop: 20,
     },
     closeButtonText: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+      color: theme.colors.onSurface,
       fontSize: 16,
       marginTop: 4,
+    },
+    fab: {
+      position: 'absolute',
+      margin: 16,
+      right: 0,
+      bottom: 0,
     },
   });
 

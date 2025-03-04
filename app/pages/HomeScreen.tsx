@@ -1,39 +1,45 @@
 import * as React from 'react';
-import { BottomNavigation } from 'react-native-paper';
-import { View, StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
+import { BottomNavigation, useTheme as usePaperTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { routes } from '../routes';
 import FactsRoute from './FactsRoute';
 import CombosRoute from './CombosRoute';
-import WikiRoute from './WikiRoute';
 import ChatRoute from './ChatRoute';
-import ContactRoute from './ContactRoute';
 import AboutRoute from './AboutRoute';
-import { useTheme } from '@react-navigation/native';
 
-interface HomeScreenProps {
-  theme: any; 
+interface Route {
+  key: string;
+  title: string;
+  icon: string;
 }
 
 export default function HomeScreen() {
   const [index, setIndex] = React.useState(0);
-  const theme = useTheme(); 
   const [routesState] = React.useState(routes);
+  const paperTheme = usePaperTheme();
 
-  const renderScene = BottomNavigation.SceneMap({
-    facts: FactsRoute,
-    combos: CombosRoute,
-    chat: ChatRoute,
-    contact: ContactRoute,
-    about: AboutRoute,
-  });
+  const renderScene = ({ route }: { route: Route }) => {
+    switch (route.key) {
+      case 'facts':
+        return <FactsRoute />;
+      case 'combos':
+        return <CombosRoute />;
+      case 'chat':
+        return <ChatRoute />;
+      case 'about':
+        return <AboutRoute />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <BottomNavigation
       navigationState={{ index, routes: routesState }}
       onIndexChange={setIndex}
       renderScene={renderScene}
-      renderIcon={({ route, focused, color }) => (
+      renderIcon={({ route, _focused, color }) => (
         <MaterialCommunityIcons
           name={route.icon}
           size={24}
@@ -45,7 +51,7 @@ export default function HomeScreen() {
         styles.barStyle,
         {
           ...Platform.select({
-            android: { elevation: 8 },
+            android: { elevation: 4 },
             ios: {
               shadowColor: '#000',
               shadowOffset: { width: 0, height: -3 },
@@ -55,9 +61,8 @@ export default function HomeScreen() {
           }),
         },
       ]}
-      activeColor={theme.colors.primary}
-      shifting={false} 
-      sceneAnimationEnabled={true}
+      activeColor={paperTheme.colors.primary}
+      shifting={false}
     />
   );
 }
@@ -65,9 +70,44 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   icon: {
     alignSelf: 'center',
-    marginBottom: 5, 
+  },
+  iconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 24,
   },
   barStyle: {
-  
   },
+  bottomBar: {
+    flexDirection: 'row',
+    height: 64,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    paddingTop: 4,
+  },
+  tabButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+    margin: 4,
+  },
+  activeDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginTop: 4,
+  },
+  inactiveDot: {
+    width: 5,
+    height: 5,
+    marginTop: 4,
+  },
+  labelContainer: {
+    marginTop: 2,
+    alignItems: 'center',
+  },
+  label: {
+    fontSize: 12,
+    textAlign: 'center',
+  }
 });

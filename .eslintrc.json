@@ -1,0 +1,73 @@
+{
+  "root": true,
+  "env": {
+    "node": true,
+    "es2022": true,
+    "react-native/react-native": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended",
+    "plugin:sonarjs/recommended",
+    "expo"
+  ],
+  "plugins": [
+    "@typescript-eslint",
+    "react",
+    "react-native",
+    "sonarjs"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "sourceType": "module",
+    "ecmaVersion": 2022,
+    "project": ["./tsconfig.json"],
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "rules": {
+    "strict": [2, "global"],
+    "arrow-parens": [2, "as-needed"],
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    "max-len": ["warn", { "code": 120 }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "react/react-in-jsx-scope": "off",
+    "react/jsx-uses-react": "off",
+    "react/prop-types": "off",
+    "sonarjs/cognitive-complexity": ["warn", 50]
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    },
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx"]
+      }
+    }
+  },
+  "overrides": [
+    {
+      "files": ["*.js", "*.jsx"],
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off"
+      },
+      "env": {
+        "node": true
+      },
+      "parserOptions": {
+        "sourceType": "script"
+      }
+    },
+    {
+      "files": ["*.ts", "*.tsx"],
+      "rules": {
+        "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+        "react/no-unescaped-entities": "off"
+      }
+    }
+  ],
+  "ignorePatterns": ["babel.config.js", "scripts/*.js"]
+}

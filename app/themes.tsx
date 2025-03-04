@@ -1,4 +1,6 @@
 import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
+import React from 'react';
+import { View, Text } from 'react-native';
 
 export const lightTheme = {
   ...MD3LightTheme,
@@ -69,3 +71,11 @@ export const darkTheme = {
     surfaceTint: '#D0BCFF',
   },
 };
+
+export default function Themes() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Theme Configuration</Text>
+    </View>
+  );
+}
