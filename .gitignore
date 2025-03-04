@@ -37,9 +37,6 @@ dist/
 web-build/
 
 # Native
-# Uncomment these if using CNG/Prebuild and want to ensure proper syncing
-/ios
-/android
 
 # Node
 node_modules/
