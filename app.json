@@ -2,7 +2,7 @@
   "expo": {
     "name": "TripSit",
     "slug": "TripSit",
-    "version": "12.0.3",
+    "version": "12.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -20,13 +20,13 @@
       "bundleIdentifier": "me.tripsit.mobile"
     },
     "android": {
-      "versionCode": 23,
+      "versionCode": 24,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "me.tripsit.mobile",
-      "runtimeVersion": "12.0.3"
+      "runtimeVersion": "12.0.4"
     },
     "web": {
       "bundler": "metro",
