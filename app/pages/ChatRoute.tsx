@@ -77,11 +77,11 @@ const ChatRoute = () => {
         originWhitelist={['*']}
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
-        onError={(syntheticEvent) => {
+        onError={syntheticEvent => {
           const { nativeEvent } = syntheticEvent;
           console.warn('WebView error: ', nativeEvent);
         }}
-        onHttpError={(syntheticEvent) => {
+        onHttpError={syntheticEvent => {
           const { nativeEvent } = syntheticEvent;
           console.warn('WebView HTTP error: ', nativeEvent);
         }}

@@ -171,9 +171,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       })
       .reduce((a, b) => a + b, 0);
 
-    const avgMinutes = totalMinutes / ranges.length;
-
-    return avgMinutes;
+    return totalMinutes / ranges.length;
   };
 
   const generateChartData = () => {

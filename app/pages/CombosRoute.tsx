@@ -149,7 +149,7 @@ const CombosRoute: React.FC = () => {
         setFilteredDrugs(drugs);
 
         // Check internet connectivity
-        NetInfo.fetch().then(async (state) => {
+        NetInfo.fetch().then(async state => {
           if (state.isConnected) {
             // Fetch data from URLs
             const [combosResponse, definitionsResponse] = await Promise.all([
@@ -208,17 +208,17 @@ const CombosRoute: React.FC = () => {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    const filtered = drugsList.filter((drug) =>
+    const filtered = drugsList.filter(drug =>
       drug.name.toLowerCase().includes(query.toLowerCase())
     );
     setFilteredDrugs(filtered);
   };
 
   const toggleDrugSelection = (drug: Drug) => {
-    if (selectedDrugs.find((d) => d.name === drug.name)) {
-      setSelectedDrugs((prevSelected) => prevSelected.filter((d) => d.name !== drug.name));
+    if (selectedDrugs.find(d => d.name === drug.name)) {
+      setSelectedDrugs(prevSelected => prevSelected.filter(d => d.name !== drug.name));
     } else if (selectedDrugs.length < 2) {
-      setSelectedDrugs((prevSelected) => [...prevSelected, drug]);
+      setSelectedDrugs(prevSelected => [...prevSelected, drug]);
     } else {
       setSnackbarVisible(true);
     }
@@ -297,7 +297,7 @@ const CombosRoute: React.FC = () => {
   };
 
   const renderDrug = ({ item }: { item: Drug }) => {
-    const isSelected = selectedDrugs.some((drug) => drug.name === item.name);
+    const isSelected = selectedDrugs.some(drug => drug.name === item.name);
     const scaleValue = new Animated.Value(1);
 
     const onPressIn = () => {
@@ -335,7 +335,7 @@ const CombosRoute: React.FC = () => {
             <Card.Title
               title={item.pretty_name}
               titleStyle={styles(isDarkMode).title}
-              left={(props) => (
+              left={props => (
                 <Avatar.Icon
                   {...props}
                   icon={iconName}
@@ -413,7 +413,7 @@ const CombosRoute: React.FC = () => {
       const status = interactionResult.status;
       const statusColor = getStatusColor(status);
       const definitionObj = comboDefinitions.find(
-        (def) => def.status.toLowerCase() === status.toLowerCase()
+        def => def.status.toLowerCase() === status.toLowerCase()
       );
       const definition = definitionObj ? definitionObj.definition : 'No definition available for this status.';
       const note = interactionResult.note;
@@ -521,7 +521,7 @@ const CombosRoute: React.FC = () => {
       />
       <FlatList
         data={filteredDrugs}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderDrug}
         contentContainerStyle={styles(isDarkMode).listContainer}
       />

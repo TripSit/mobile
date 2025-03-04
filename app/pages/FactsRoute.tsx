@@ -307,7 +307,7 @@ const FactsRoute: React.FC = () => {
   };
 
   const getCategoryIcon = (categories: string[]): string => {
-    for (let category of categories) {
+    for (const category of categories) {
       if (categoryIcons[category.toLowerCase()]) {
         return categoryIcons[category.toLowerCase()];
       }
@@ -316,7 +316,7 @@ const FactsRoute: React.FC = () => {
   };
 
   const getCategoryColor = (categories: string[]): string => {
-    for (let category of categories) {
+    for (const category of categories) {
       if (categoryColors[category.toLowerCase()]) {
         return categoryColors[category.toLowerCase()];
       }
@@ -335,7 +335,7 @@ const FactsRoute: React.FC = () => {
           <Card.Title
             title={item.name}
             titleStyle={styles(isDarkMode).title}
-            left={(props) => (
+            left={props => (
               <Avatar.Icon
                 {...props}
                 icon={icon}
@@ -420,7 +420,7 @@ const FactsRoute: React.FC = () => {
       )}
       <FlatList
         data={displayedData}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderDrug}
         contentContainerStyle={styles(isDarkMode).listContainer}
         onEndReached={loadMoreData}
@@ -443,7 +443,7 @@ const FactsRoute: React.FC = () => {
           <Text style={styles(isDarkMode).modalTitle}>Filter by Categories</Text>
           <FlatList
             data={allCategories}
-            keyExtractor={(item) => item}
+            keyExtractor={item => item}
             renderItem={({ item }) => (
               <View style={styles(isDarkMode).checkboxContainer}>
                 <Checkbox
