@@ -59,6 +59,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import localDrugData from '../data/drugs.json';
 import DrugDetailScreen from '../components/DrugDetail';
 import { formatDistance } from 'date-fns';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 type Combo = {
   status: string;
@@ -239,11 +240,17 @@ const FactsRoute: React.FC = () => {
 
   const toggleFilterModal = () => {
     if (filterModalY.value === windowHeight) {
-      filterModalY.value = withSpring(windowHeight * 0.4);
-      listScale.value = withTiming(0.95);
+      filterModalY.value = withSpring(0, {
+        damping: 20,
+        stiffness: 90,
+      });
+      listScale.value = withTiming(0.95, { duration: 200 });
     } else {
-      filterModalY.value = withSpring(windowHeight);
-      listScale.value = withTiming(1);
+      filterModalY.value = withSpring(windowHeight, {
+        damping: 20,
+        stiffness: 90,
+      });
+      listScale.value = withTiming(1, { duration: 200 });
     }
     setIsFilterModalVisible(!isFilterModalVisible);
   };
@@ -388,28 +395,31 @@ const FactsRoute: React.FC = () => {
     }
   };
 
-  const categoryIcons: { [key: string]: string } = {
-    depressant: 'sleep',
-    psychedelic: 'brain',
-    stimulant: 'flash',
-    opioid: 'needle',
-    cannabinoid: 'leaf',
-    dissociative: 'cloud',
-    deliriant: 'ghost',
-    nootropic: 'school',
-    'research chemical': 'flask',
-    antidepressant: 'emoticon-happy',
-    antipsychotic: 'emoticon-neutral',
-    benzodiazepine: 'sleep',
-    ssri: 'emoticon-neutral',
-    maoi: 'food-apple',
-    vitamin: 'pill',
-    entactogen: 'heart',
-    alcohol: 'glass-wine',
-    gabaergic: 'sleep',
-    steroid: 'dumbbell',
-    unclassified: 'help-circle',
-    'habit-forming': 'alert',
+  const getIconForCategory = (category: string): keyof typeof MaterialCommunityIcons.glyphMap => {
+    const iconMap: { [key: string]: keyof typeof MaterialCommunityIcons.glyphMap } = {
+      depressant: 'sleep',
+      psychedelic: 'brain',
+      stimulant: 'flash',
+      opioid: 'needle',
+      cannabinoid: 'leaf',
+      dissociative: 'cloud',
+      deliriant: 'ghost',
+      nootropic: 'school',
+      'research chemical': 'flask',
+      antidepressant: 'emoticon-happy',
+      antipsychotic: 'emoticon-neutral',
+      benzodiazepine: 'sleep',
+      ssri: 'emoticon-neutral',
+      maoi: 'food-apple',
+      vitamin: 'pill',
+      entactogen: 'heart',
+      alcohol: 'glass-wine',
+      gabaergic: 'sleep',
+      steroid: 'dumbbell',
+      unclassified: 'help-circle',
+      'habit-forming': 'alert',
+    };
+    return iconMap[category] || 'pill';
   };
 
   const categoryColors: { [key: string]: string } = {
@@ -436,15 +446,6 @@ const FactsRoute: React.FC = () => {
     'habit-forming': '#FF5252',
   };
 
-  const getCategoryIcon = (categories: string[]): string => {
-    for (const category of categories) {
-      if (categoryIcons[category.toLowerCase()]) {
-        return categoryIcons[category.toLowerCase()];
-      }
-    }
-    return 'pill';
-  };
-
   const getCategoryColor = (categories: string[]): string => {
     for (const category of categories) {
       if (categoryColors[category.toLowerCase()]) {
@@ -456,7 +457,7 @@ const FactsRoute: React.FC = () => {
 
   const renderDrug = useCallback(({ item, index }: { item: Drug; index: number }) => {
     const categories = item.categories;
-    const icon = getCategoryIcon(categories);
+    const icon = getIconForCategory(categories[0]);
     const color = getCategoryColor(categories);
 
     return (
@@ -628,41 +629,60 @@ const FactsRoute: React.FC = () => {
               </Text>
               <IconButton
                 icon="close"
+                size={24}
                 onPress={toggleFilterModal}
                 mode="contained-tonal"
               />
             </View>
-            <ScrollView 
+            <ScrollView
               style={styles(isDarkMode, theme).filterScroll}
               showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles(isDarkMode, theme).filterScrollContent}
             >
               <View style={styles(isDarkMode, theme).categoriesContainer}>
                 {Array.from(
                   new Set(data.flatMap((drug) => drug.categories.map((cat) => cat.toLowerCase())))
-                ).sort().map((category) => (
-                  <Chip
+                ).sort().map((category, index) => (
+                  <Animated.View
                     key={category}
-                    selected={selectedCategories.includes(category)}
-                    onPress={() => handleCategorySelection(category)}
-                    style={[
-                      styles(isDarkMode, theme).filterChip,
-                      selectedCategories.includes(category) && {
-                        backgroundColor: theme.colors.primaryContainer,
-                      },
-                    ]}
-                    textStyle={{ 
-                      color: selectedCategories.includes(category) 
-                        ? theme.colors.onPrimaryContainer 
-                        : theme.colors.onSurfaceVariant
-                    }}
-                    showSelectedOverlay
+                    entering={FadeIn.delay(index * 50).springify()}
                   >
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </Chip>
+                    <Chip
+                      selected={selectedCategories.includes(category)}
+                      onPress={() => handleCategorySelection(category)}
+                      style={[
+                        styles(isDarkMode, theme).filterChip,
+                        selectedCategories.includes(category) && {
+                          backgroundColor: theme.colors.primaryContainer,
+                        },
+                      ]}
+                      avatar={
+                        <MaterialCommunityIcons
+                          name={getIconForCategory(category)}
+                          size={18}
+                          color={selectedCategories.includes(category)
+                            ? theme.colors.onPrimaryContainer
+                            : theme.colors.onSurfaceVariant}
+                        />
+                      }
+                      textStyle={{
+                        color: selectedCategories.includes(category)
+                          ? theme.colors.onPrimaryContainer
+                          : theme.colors.onSurfaceVariant,
+                      }}
+                      showSelectedOverlay
+                      compact
+                    >
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </Chip>
+                  </Animated.View>
                 ))}
               </View>
             </ScrollView>
-            <View style={styles(isDarkMode, theme).filterActions}>
+            <Animated.View 
+              style={styles(isDarkMode, theme).filterActions}
+              entering={SlideInRight.delay(200)}
+            >
               <Button
                 mode="outlined"
                 onPress={() => {
@@ -670,6 +690,7 @@ const FactsRoute: React.FC = () => {
                   applyFilters(searchQuery, []);
                 }}
                 style={styles(isDarkMode, theme).clearButton}
+                labelStyle={{ letterSpacing: 0 }}
               >
                 Clear All
               </Button>
@@ -677,10 +698,11 @@ const FactsRoute: React.FC = () => {
                 mode="contained"
                 onPress={toggleFilterModal}
                 style={styles(isDarkMode, theme).applyButton}
+                labelStyle={{ letterSpacing: 0 }}
               >
-                Apply ({selectedCategories.length})
+                Apply {selectedCategories.length > 0 ? `(${selectedCategories.length})` : ''}
               </Button>
-            </View>
+            </Animated.View>
           </View>
         </AnimatedSurface>
       </Portal>
@@ -780,10 +802,14 @@ const styles = (isDarkMode: boolean, theme: any) =>
       backgroundColor: isDarkMode ? theme.colors.elevation.level2 : theme.colors.surface,
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
-      padding: 24,
+      padding: 16,
       paddingTop: 12,
       elevation: 8,
-      maxHeight: '70%',
+      height: '80%',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -3 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
     },
     filterModalHandle: {
       width: 32,
@@ -791,7 +817,7 @@ const styles = (isDarkMode: boolean, theme: any) =>
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
       borderRadius: 2,
       alignSelf: 'center',
-      marginBottom: 12,
+      marginBottom: 16,
     },
     filterModalContent: {
       flex: 1,
@@ -801,34 +827,45 @@ const styles = (isDarkMode: boolean, theme: any) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 16,
+      paddingHorizontal: 8,
     },
     filterTitle: {
       color: isDarkMode ? theme.colors.onSurface : theme.colors.onSurface,
       fontWeight: '600',
+      fontSize: 20,
     },
     filterScroll: {
       flex: 1,
-      marginBottom: 16,
+    },
+    filterScrollContent: {
+      paddingBottom: 16,
     },
     categoriesContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
+      paddingHorizontal: 8,
     },
     filterChip: {
       marginBottom: 8,
       backgroundColor: isDarkMode ? theme.colors.elevation.level3 : theme.colors.surfaceVariant,
+      height: 36,
     },
     filterActions: {
       flexDirection: 'row',
       gap: 12,
-      marginTop: 'auto',
+      paddingTop: 16,
+      paddingHorizontal: 8,
+      borderTopWidth: 1,
+      borderTopColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
     },
     clearButton: {
       flex: 1,
+      borderRadius: 20,
     },
     applyButton: {
       flex: 1,
+      borderRadius: 20,
     },
     modalContent: {
       flex: 1,
