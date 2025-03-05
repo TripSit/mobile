@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,7 +6,8 @@ import {
   Dimensions,
   Linking,
   ScrollView,
-  TouchableOpacity, 
+  TouchableOpacity,
+  useColorScheme,
 } from 'react-native';
 import {
   Chip,
@@ -24,6 +25,10 @@ import {
   Tooltip,
   Avatar,
   AnimatedFAB,
+  SegmentedButtons,
+  IconButton,
+  Badge,
+  ProgressBar,
 } from 'react-native-paper';
 import { LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -36,7 +41,12 @@ import Animated, {
   runOnJS,
   FadeIn,
   SlideInRight,
+  interpolate,
+  Extrapolate,
+  useAnimatedScrollHandler,
 } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { format, formatDistanceToNow } from 'date-fns';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -89,20 +99,53 @@ type DrugDetailScreenProps = {
 };
 
 const AnimatedSurface = Animated.createAnimatedComponent(Surface);
+const AnimatedCard = Animated.createAnimatedComponent(Card);
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
 const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) => {
   const theme = useTheme();
+  const isDarkMode = useColorScheme() === 'dark';
+  const [selectedTab, setSelectedTab] = useState('overview');
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const windowWidth = Dimensions.get('window').width;
   
   const headerOpacity = useSharedValue(0);
   const contentOpacity = useSharedValue(0);
   const slideIn = useSharedValue(-100);
+  const scrollY = useSharedValue(0);
 
   const drugDetails = drug.details;
 
-  const headerAnimationStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-    transform: [{ translateY: slideIn.value }]
-  }));
+  useEffect(() => {
+    const getLastUpdated = async () => {
+      try {
+        const timestamp = await AsyncStorage.getItem('drugDataLastUpdated');
+        if (timestamp) {
+          setLastUpdated(formatDistanceToNow(new Date(timestamp), { addSuffix: true }));
+        }
+      } catch (error) {
+        console.error('Error getting last updated timestamp:', error);
+      }
+    };
+
+    getLastUpdated();
+  }, []);
+
+  const headerAnimationStyle = useAnimatedStyle(() => {
+    const elevation = interpolate(
+      scrollY.value,
+      [0, 50],
+      [0, 4],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      opacity: headerOpacity.value,
+      transform: [{ translateY: slideIn.value }],
+      elevation,
+      shadowOpacity: elevation / 4,
+    };
+  });
 
   const contentAnimationStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
@@ -210,14 +253,264 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       datasets: [
         {
           data: intensities,
-          color: (opacity = 1) => theme.colors.primary + (opacity !== 1 ? opacity * 255 : ''), 
+          color: (opacity = 1) => 
+            theme.colors.primary + (opacity !== 1 ? Math.round(opacity * 255).toString(16) : ''),
           strokeWidth: 2,
         },
       ],
     };
   };
 
-  const chartData = generateChartData();
+  const generateTimelineData = () => {
+    if (!drugDetails) return null;
+
+    const onset = drugDetails.formatted_onset?.value;
+    const duration = drugDetails.formatted_duration?.value;
+    const aftereffects = drugDetails.formatted_aftereffects?.value;
+
+    const onsetMinutes = parseDuration(onset);
+    const durationMinutes = parseDuration(duration);
+    const aftereffectsMinutes = parseDuration(aftereffects);
+
+    return [
+      {
+        phase: 'Onset',
+        duration: onsetMinutes,
+        color: theme.colors.primary,
+        intensity: 30,
+      },
+      {
+        phase: 'Peak',
+        duration: durationMinutes,
+        color: theme.colors.secondary,
+        intensity: 100,
+      },
+      {
+        phase: 'After Effects',
+        duration: aftereffectsMinutes,
+        color: theme.colors.tertiary,
+        intensity: 50,
+      },
+    ];
+  };
+
+  const renderTimeline = () => {
+    const timelineData = generateTimelineData();
+    if (!timelineData) return null;
+
+    const totalDuration = timelineData.reduce((sum, phase) => sum + phase.duration, 0);
+
+    return (
+      <Card style={styles(theme).timelineCard} mode="elevated">
+        <Card.Content>
+          <View style={styles(theme).sectionHeader}>
+            <MaterialCommunityIcons name="clock-outline" size={24} color={theme.colors.primary} />
+            <Title style={styles(theme).sectionTitle}>Duration Profile</Title>
+          </View>
+          <View style={styles(theme).timeline}>
+            {timelineData.map((phase, index) => (
+              <View
+                key={phase.phase}
+                style={[
+                  styles(theme).timelinePhase,
+                  { flex: phase.duration / totalDuration },
+                ]}
+              >
+                <View style={styles(theme).timelineBar}>
+                  <ProgressBar
+                    progress={phase.intensity / 100}
+                    color={phase.color}
+                    style={styles(theme).progressBar}
+                  />
+                </View>
+                <Text style={styles(theme).timelineLabel}>
+                  {phase.phase}
+                  {'\n'}
+                  {formatDuration(phase.duration)}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles(theme).timelineInfo}>
+            <View style={styles(theme).infoItem}>
+              <MaterialCommunityIcons name="timer-outline" size={20} color={theme.colors.onSurfaceVariant} />
+              <Text style={styles(theme).infoText}>
+                Onset: {drugDetails.formatted_onset?.value}
+              </Text>
+            </View>
+            <View style={styles(theme).infoItem}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.onSurfaceVariant} />
+              <Text style={styles(theme).infoText}>
+                Duration: {drugDetails.formatted_duration?.value}
+              </Text>
+            </View>
+            <View style={styles(theme).infoItem}>
+              <MaterialCommunityIcons name="clock-check-outline" size={20} color={theme.colors.onSurfaceVariant} />
+              <Text style={styles(theme).infoText}>
+                After Effects: {drugDetails.formatted_aftereffects?.value}
+              </Text>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  const renderEffectsChart = () => {
+    const chartData = generateChartData();
+    if (!chartData) return null;
+
+    return (
+      <Card style={styles(theme).chartCard}>
+        <Card.Content>
+          <Title style={styles(theme).chartTitle}>Intensity Over Time</Title>
+          <LineChart
+            data={chartData}
+            width={screenWidth - 48}
+            height={220}
+            chartConfig={{
+              backgroundColor: theme.colors.surface,
+              backgroundGradientFrom: theme.colors.surface,
+              backgroundGradientTo: theme.colors.surface,
+              decimalPlaces: 0,
+              color: (opacity = 1) => theme.colors.primary + Math.round(opacity * 255).toString(16),
+              labelColor: () => theme.colors.onSurface,
+              style: {
+                borderRadius: 16,
+              },
+              propsForDots: {
+                r: '6',
+                strokeWidth: '2',
+                stroke: theme.colors.primary,
+              },
+            }}
+            bezier
+            style={styles(theme).chart}
+          />
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  const renderEffects = () => {
+    if (!drugDetails.formatted_effects) return null;
+
+    return (
+      <Card style={styles(theme).effectsCard} mode="elevated">
+        <Card.Content>
+          <View style={styles(theme).sectionHeader}>
+            <MaterialCommunityIcons name="star-outline" size={24} color={theme.colors.primary} />
+            <Title style={styles(theme).sectionTitle}>Common Effects</Title>
+          </View>
+          <View style={styles(theme).effectsGrid}>
+            {drugDetails.formatted_effects.map((effect, index) => (
+              <View key={index} style={styles(theme).effectItem}>
+                <MaterialCommunityIcons 
+                  name="circle-medium" 
+                  size={20} 
+                  color={theme.colors.primary} 
+                />
+                <Text style={styles(theme).effectText}>{effect}</Text>
+              </View>
+            ))}
+          </View>
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  const renderDoseTable = () => {
+    if (!drugDetails.formatted_dose) return null;
+
+    return (
+      <Card style={styles(theme).doseCard} mode="elevated">
+        <Card.Content>
+          <View style={styles(theme).sectionHeader}>
+            <MaterialCommunityIcons name="scale" size={24} color={theme.colors.primary} />
+            <Title style={styles(theme).sectionTitle}>Dosage Information</Title>
+          </View>
+          {Object.entries(drugDetails.formatted_dose).map(([route, doses]) => (
+            <View key={route} style={styles(theme).doseSection}>
+              <Text style={styles(theme).doseRoute}>{route}</Text>
+              <View style={styles(theme).doseGrid}>
+                {Object.entries(doses).map(([classification, amount]) => (
+                  <View key={classification} style={styles(theme).doseItem}>
+                    <Text style={styles(theme).doseClassification}>{classification}</Text>
+                    <Text style={styles(theme).doseAmount}>{amount}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+          {drugDetails.dose_note && (
+            <View style={styles(theme).doseNote}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={20} color={theme.colors.error} />
+              <Text style={styles(theme).doseNoteText}>{drugDetails.dose_note}</Text>
+            </View>
+          )}
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  const renderCombos = () => {
+    if (!drugDetails.combos) return null;
+
+    return (
+      <Card style={styles(theme).combosCard} mode="elevated">
+        <Card.Content>
+          <View style={styles(theme).sectionHeader}>
+            <MaterialCommunityIcons name="molecule" size={24} color={theme.colors.primary} />
+            <Title style={styles(theme).sectionTitle}>Drug Interactions</Title>
+          </View>
+          <View style={styles(theme).combosGrid}>
+            {Object.entries(drugDetails.combos).map(([drug, combo]) => (
+              <Surface
+                key={drug}
+                style={[
+                  styles(theme).comboItem,
+                  { backgroundColor: getComboColor(combo.status) },
+                ]}
+                elevation={2}
+              >
+                <View style={styles(theme).comboHeader}>
+                  <MaterialCommunityIcons
+                    name={getComboIcon(combo.status)}
+                    size={24}
+                    color={theme.colors.surface}
+                  />
+                  <Text style={styles(theme).comboDrug}>{drug}</Text>
+                  <Badge style={styles(theme).comboStatus}>{combo.status}</Badge>
+                </View>
+                {combo.note && (
+                  <Text style={styles(theme).comboNote}>{combo.note}</Text>
+                )}
+              </Surface>
+            ))}
+          </View>
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  const renderContent = () => {
+    switch (selectedTab) {
+      case 'overview':
+        return (
+          <>
+            {renderTimeline()}
+            {renderEffectsChart()}
+            {renderEffects()}
+          </>
+        );
+      case 'dosage':
+        return renderDoseTable();
+      case 'interactions':
+        return renderCombos();
+      default:
+        return null;
+    }
+  };
 
   const getCategoryColor = (category: string) => {
     const categoryColors: { [key: string]: string } = {
@@ -273,7 +566,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       case 'low risk & decrease':
         return theme.colors.primary;
       case 'caution':
-        return MD3Colors.orange700;
+        return theme.colors.tertiary;
       case 'unsafe':
       case 'dangerous':
         return theme.colors.error;
@@ -282,348 +575,158 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
     }
   };
 
-  const renderDosageRow = (label: string, amount: string) => (
-    <DataTable.Row key={label}>
-      <DataTable.Cell>{label}</DataTable.Cell>
-      <DataTable.Cell numeric>{amount}</DataTable.Cell>
-    </DataTable.Row>
-  );
-
-  const chartConfig = {
-    backgroundGradientFrom: theme.colors.surface,
-    backgroundGradientTo: theme.colors.surface,
-    color: (opacity = 1) => theme.colors.primary + (opacity !== 1 ? opacity * 255 : ''),
-    labelColor: (opacity = 1) => theme.colors.onSurface,
-    propsForDots: {
-      r: '4',
-      strokeWidth: '2',
-      stroke: theme.colors.primary,
-    },
-    propsForBackgroundLines: {
-      strokeDasharray: '',
-      stroke: theme.dark ? theme.colors.surfaceDisabled : theme.colors.surfaceVariant,
-    },
-    decimalPlaces: 0,
+  const formatDuration = (minutes: number): string => {
+    if (minutes < 60) {
+      return `${Math.round(minutes)}m`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = Math.round(minutes % 60);
+    return remainingMinutes > 0
+      ? `${hours}h ${remainingMinutes}m`
+      : `${hours}h`;
   };
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
 
   if (!drugDetails) {
     return (
-      <Animated.View 
-        style={[
-          styles(theme).container, 
-          { justifyContent: 'center', alignItems: 'center' }
-        ]}
-        entering={FadeIn.duration(500)}
-      >
+      <View style={styles(theme).loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text variant="titleMedium" style={{ marginTop: 20 }}>
-          Substance details not available.
-        </Text>
-        <AnimatedFAB
-          icon="close"
-          label="Close"
-          onPress={onClose}
-          style={styles(theme).fab}
-          extended={true}
-          variant="surface"
-          color={theme.colors.onSurface}
-          rippleColor={theme.colors.primaryContainer}
-          animateFrom='right'
-          iconMode='dynamic'
-        />
-      </Animated.View>
+        <Text style={styles(theme).loadingText}>Loading substance details...</Text>
+      </View>
     );
   }
 
   return (
     <View style={styles(theme).container}>
-      <Appbar.Header style={styles(theme).appBar} elevated>
-        <Appbar.BackAction onPress={onClose} />
-        <Appbar.Content 
-          title={drugDetails.pretty_name || drug.name} 
-          titleStyle={styles(theme).appBarTitle}
-        />
-      </Appbar.Header>
-      
-      <ScrollView contentContainerStyle={styles(theme).scrollContainer}>
-        {/* Header Section with Categories and Aliases */}
-        <Animated.View style={[styles(theme).headerSection, headerAnimationStyle]}>
-          {/* Categories */}
-          {drugDetails.categories && drugDetails.categories.length > 0 && (
-            <View style={styles(theme).section}>
-              <Text variant="labelLarge" style={styles(theme).sectionLabel}>Categories</Text>
-              <View style={styles(theme).chipContainer}>
-                {drugDetails.categories.map((category: string, index: number) => (
-                  <Chip
-                    key={index}
-                    style={[
-                      styles(theme).chip,
-                      { backgroundColor: getCategoryColor(category) }
-                    ]}
-                    textStyle={styles(theme).chipText}
-                    mode="flat"
-                    elevation={1}
-                  >
-                    {category}
-                  </Chip>
-                ))}
-              </View>
+      <Animated.View style={[styles(theme).header, headerAnimationStyle]}>
+        <Appbar.Header 
+          style={[styles(theme).appBar]} 
+          mode="center-aligned"
+          theme={{
+            colors: {
+              surface: theme.colors.elevation.level2,
+            },
+          }}
+        >
+          <Appbar.BackAction 
+            onPress={onClose}
+            iconColor={theme.colors.onSurface}
+          />
+          <Appbar.Content
+            title={drugDetails.pretty_name || drug.name}
+            titleStyle={{ color: theme.colors.onSurface }}
+            subtitle={lastUpdated ? `Last updated ${lastUpdated}` : undefined}
+            subtitleStyle={{ 
+              color: `${theme.colors.onSurface}80`
+            }}
+          />
+          <Appbar.Action 
+            icon="share" 
+            onPress={() => {}}
+            iconColor={theme.colors.onSurface}
+          />
+        </Appbar.Header>
+      </Animated.View>
+
+      <SegmentedButtons
+        value={selectedTab}
+        onValueChange={setSelectedTab}
+        buttons={[
+          {
+            value: 'overview',
+            label: 'Overview',
+            icon: 'information',
+            style: styles(theme).segmentButton
+          },
+          {
+            value: 'dosage',
+            label: 'Dosage',
+            icon: 'scale',
+            style: styles(theme).segmentButton
+          },
+          {
+            value: 'interactions',
+            label: 'Interactions',
+            icon: 'molecule',
+            style: styles(theme).segmentButton
+          },
+        ]}
+        style={[
+          styles(theme).segmentedButtons,
+          { backgroundColor: theme.colors.elevation.level2 }
+        ]}
+      />
+
+      <AnimatedScrollView
+        style={[styles(theme).content, contentAnimationStyle]}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card style={styles(theme).summaryCard} mode="elevated">
+          <Card.Content>
+            <View style={styles(theme).categoryContainer}>
+              {drug.categories.map((category, index) => (
+                <Chip
+                  key={index}
+                  style={[
+                    styles(theme).categoryChip,
+                    { backgroundColor: getCategoryColor(category) },
+                  ]}
+                  textStyle={styles(theme).categoryChipText}
+                >
+                  {category}
+                </Chip>
+              ))}
             </View>
-          )}
-
-          {/* Aliases */}
-          {drugDetails.aliases && drugDetails.aliases.length > 0 && (
-            <View style={styles(theme).section}>
-              <Text variant="labelLarge" style={styles(theme).sectionLabel}>Aliases</Text>
-              <View style={styles(theme).chipContainer}>
-                {drugDetails.aliases.map((alias: string, index: number) => (
-                  <Chip
-                    key={index}
-                    style={styles(theme).chip}
-                    textStyle={styles(theme).chipText}
-                    mode="outlined"
-                  >
-                    {alias}
-                  </Chip>
-                ))}
+            <Paragraph style={styles(theme).summary}>
+              {drugDetails.properties?.summary}
+            </Paragraph>
+            {drug.aliases.length > 0 && (
+              <View style={styles(theme).aliasesContainer}>
+                <Text style={styles(theme).aliasesLabel}>Also known as:</Text>
+                <Text style={styles(theme).aliases}>
+                  {drug.aliases.join(', ')}
+                </Text>
               </View>
-            </View>
-          )}
-        </Animated.View>
+            )}
+          </Card.Content>
+        </Card>
 
-        <Divider style={styles(theme).divider} />
+        {renderContent()}
 
-        {/* Main Content */}
-        <Animated.View style={[contentAnimationStyle]}>
-          {/* Summary */}
-          {drugDetails.properties?.summary && (
-            <Animatable.View animation="fadeIn" duration={800} delay={300}>
-              <Card style={styles(theme).card} mode="elevated">
-                <Card.Content>
-                  <Title style={styles(theme).cardTitle}>Summary</Title>
-                  <Paragraph style={styles(theme).paragraph}>
-                    {drugDetails.properties.summary}
-                  </Paragraph>
-                </Card.Content>
-              </Card>
-            </Animatable.View>
-          )}
-
-          {/* Effects */}
-          {drugDetails.formatted_effects && drugDetails.formatted_effects.length > 0 && (
-            <Animatable.View animation="fadeIn" duration={800} delay={400}>
-              <Card style={styles(theme).card} mode="elevated">
-                <Card.Content>
-                  <Title style={styles(theme).cardTitle}>Common Effects</Title>
-                  <View style={styles(theme).chipContainer}>
-                    {drugDetails.formatted_effects.map((effect: string, index: number) => (
-                      <Chip
-                        key={index}
-                        style={styles(theme).effectChip}
-                        textStyle={styles(theme).chipText}
-                        mode="outlined"
-                        icon="star-outline"
-                      >
-                        {effect}
-                      </Chip>
-                    ))}
-                  </View>
-                </Card.Content>
-              </Card>
-            </Animatable.View>
-          )}
-
-          {/* Effect Intensity Chart */}
-          {chartData && (
-            <Animatable.View animation="fadeIn" duration={800} delay={500}>
-              <Card style={styles(theme).card} mode="elevated">
-                <Card.Content>
-                  <Title style={styles(theme).cardTitle}>Effect Timeline</Title>
-                  <LineChart
-                    data={chartData}
-                    width={screenWidth - 48}
-                    height={220}
-                    chartConfig={chartConfig}
-                    bezier
-                    style={styles(theme).chartStyle}
-                    withInnerLines={false}
-                    yAxisLabel=""
-                    yAxisSuffix="%"
-                    yAxisInterval={25}
+        {drugDetails.links && Object.keys(drugDetails.links).length > 0 && (
+          <Card style={styles(theme).linksCard} mode="elevated">
+            <Card.Content>
+              <View style={styles(theme).sectionHeader}>
+                <MaterialCommunityIcons name="link" size={24} color={theme.colors.primary} />
+                <Title style={styles(theme).sectionTitle}>Additional Resources</Title>
+              </View>
+              {Object.entries(drugDetails.links).map(([key, url]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={styles(theme).linkItem}
+                  onPress={() => Linking.openURL(url)}
+                >
+                  <MaterialCommunityIcons
+                    name="open-in-new"
+                    size={20}
+                    color={theme.colors.primary}
                   />
-                  <View style={styles(theme).durationInfo}>
-                    <View style={styles(theme).durationItem}>
-                      <Avatar.Icon size={24} icon="timer-outline" style={styles(theme).durationIcon} />
-                      <Text variant="bodyMedium">
-                        <Text style={{fontWeight: 'bold'}}>Onset:</Text> {drugDetails.formatted_onset?.value ?? 'Unknown'}{' '}
-                        {drugDetails.formatted_onset?._unit ?? ''}
-                      </Text>
-                    </View>
-                    <View style={styles(theme).durationItem}>
-                      <Avatar.Icon size={24} icon="clock-outline" style={styles(theme).durationIcon} />
-                      <Text variant="bodyMedium">
-                        <Text style={{fontWeight: 'bold'}}>Duration:</Text> {drugDetails.formatted_duration?.value ?? 'Unknown'}{' '}
-                        {drugDetails.formatted_duration?._unit ?? ''}
-                      </Text>
-                    </View>
-                    <View style={styles(theme).durationItem}>
-                      <Avatar.Icon size={24} icon="clock-time-four-outline" style={styles(theme).durationIcon} />
-                      <Text variant="bodyMedium">
-                        <Text style={{fontWeight: 'bold'}}>After effects:</Text> {drugDetails.formatted_aftereffects?.value ?? 'Unknown'}{' '}
-                        {drugDetails.formatted_aftereffects?._unit ?? ''}
-                      </Text>
-                    </View>
-                  </View>
-                </Card.Content>
-              </Card>
-            </Animatable.View>
-          )}
-
-          {/* Doses */}
-          {drugDetails.formatted_dose && Object.keys(drugDetails.formatted_dose).length > 0 && (
-            <Animatable.View animation="fadeIn" duration={800} delay={600}>
-              <Card style={styles(theme).card} mode="elevated">
-                <Card.Content>
-                  <Title style={styles(theme).cardTitle}>Dosage</Title>
-                  {Object.entries(drugDetails.formatted_dose).map(([roa, doses], index) => (
-                    <View key={roa} style={styles(theme).doseSection}>
-                      <Text variant="titleMedium" style={styles(theme).subSectionTitle}>{roa}</Text>
-                      <DataTable>
-                        <DataTable.Header>
-                          <DataTable.Title>Strength</DataTable.Title>
-                          <DataTable.Title numeric>Amount</DataTable.Title>
-                        </DataTable.Header>
-                        {Object.entries(doses as { [key: string]: string }).map(([strength, amount]) =>
-                          renderDosageRow(strength, amount)
-                        )}
-                      </DataTable>
-                    </View>
-                  ))}
-                  {drugDetails.dose_note && (
-                    <Paragraph style={styles(theme).paragraph}>
-                      {drugDetails.dose_note}
-                    </Paragraph>
-                  )}
-                </Card.Content>
-              </Card>
-            </Animatable.View>
-          )}
-
-          {/* Combos */}
-          {drugDetails.combos && Object.keys(drugDetails.combos).length > 0 && (
-            <Animatable.View animation="fadeIn" duration={800} delay={700}>
-              <Card style={styles(theme).card} mode="elevated">
-                <Card.Content>
-                  <Title style={styles(theme).cardTitle}>Combinations</Title>
-                  {Object.entries(drugDetails.combos).map(([comboDrug, details], index) => (
-                    <AnimatedSurface
-                      key={index}
-                      style={[
-                        styles(theme).comboCard,
-                        { borderLeftColor: getComboColor(details.status) }
-                      ]}
-                      elevation={1}
-                      entering={SlideInRight.delay(100 * index).springify()}
-                    >
-                      <View style={styles(theme).comboHeader}>
-                        <Avatar.Icon 
-                          size={32} 
-                          icon={getComboIcon(details.status)}
-                          color={getComboColor(details.status)}
-                          style={styles(theme).comboIcon} 
-                        />
-                        <Text variant="titleMedium" style={styles(theme).comboDrugName}>
-                          {comboDrug.toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={styles(theme).comboStatus}>
-                        Status: <Text style={{ fontWeight: 'bold' }}>{details.status}</Text>
-                      </Text>
-                      {details.note && (
-                        <Text style={styles(theme).comboNote}>Note: {details.note}</Text>
-                      )}
-                      {details.sources && details.sources.length > 0 && (
-                        <View style={styles(theme).sourcesSection}>
-                          <Text style={styles(theme).sourcesTitle}>Sources:</Text>
-                          {details.sources.map((source: any, idx: number) => (
-                            <TouchableOpacity
-                              key={idx}
-                              onPress={() => Linking.openURL(source.url)}
-                            >
-                              <Text style={styles(theme).sourceLink}>
-                                - {source.author}: {source.title}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-                    </AnimatedSurface>
-                  ))}
-                </Card.Content>
-              </Card>
-            </Animatable.View>
-          )}
-
-          {/* External Links */}
-          {drugDetails.links && (
-            <Animatable.View animation="fadeIn" duration={800} delay={800}>
-              <Card style={styles(theme).card} mode="elevated">
-                <Card.Content>
-                  <Title style={styles(theme).cardTitle}>External Links</Title>
-                  {drugDetails.links.experiences && (
-                    <Tooltip title="View Erowid Experience Vault">
-                      <TouchableOpacity
-                        style={styles(theme).linkButton}
-                        onPress={() => Linking.openURL(drugDetails.links!.experiences!)}
-                      >
-                        <MaterialCommunityIcons name="earth" size={24} color={theme.colors.primary} />
-                        <Text style={styles(theme).linkText}>Erowid Experiences</Text>
-                      </TouchableOpacity>
-                    </Tooltip>
-                  )}
-                  {drugDetails.links.tihkal && (
-                    <Tooltip title="View TIHKAL Entry">
-                      <TouchableOpacity 
-                        style={styles(theme).linkButton}
-                        onPress={() => Linking.openURL(drugDetails.links!.tihkal!)}
-                      >
-                        <MaterialCommunityIcons name="book-open-variant" size={24} color={theme.colors.primary} />
-                        <Text style={styles(theme).linkText}>TIHKAL</Text>
-                      </TouchableOpacity>
-                    </Tooltip>
-                  )}
-                </Card.Content>
-              </Card>
-            </Animatable.View>
-          )}
-
-          {/* General Sources */}
-          {drugDetails.sources && drugDetails.sources._general && (
-            <Animatable.View animation="fadeIn" duration={800} delay={900}>
-              <Card style={styles(theme).card} mode="elevated">
-                <Card.Content>
-                  <Title style={styles(theme).cardTitle}>General Sources</Title>
-                  {drugDetails.sources._general.map((source: string, index: number) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => {
-                        const urlMatch = source.match(/\bhttps?:\/\/\S+/gi);
-                        if (urlMatch && urlMatch[0]) {
-                          Linking.openURL(urlMatch[0]);
-                        }
-                      }}
-                    >
-                      <Text style={styles(theme).sourceLink}>- {source}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </Card.Content>
-              </Card>
-            </Animatable.View>
-          )}
-
-          <View style={{ height: 30 }} />
-        </Animated.View>
-      </ScrollView>
+                  <Text style={styles(theme).linkText}>
+                    {key.charAt(0).toUpperCase() + key.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </Card.Content>
+          </Card>
+        )}
+      </AnimatedScrollView>
     </View>
   );
 };
@@ -634,190 +737,245 @@ const styles = (theme: any) =>
       flex: 1,
       backgroundColor: theme.colors.background,
     },
+    header: {
+      zIndex: 1,
+      backgroundColor: theme.colors.elevation.level2,
+    },
     appBar: {
-      backgroundColor: theme.colors.surface,
+      elevation: 0,
+      backgroundColor: theme.colors.elevation.level2,
     },
-    appBarTitle: {
-      fontWeight: 'bold',
-      color: theme.colors.onSurface,
+    segmentedButtons: {
+      margin: 16,
+      borderRadius: 28,
     },
-    scrollContainer: {
-      padding: 16,
-      paddingBottom: 30,
+    segmentButton: {
+      borderRadius: 28,
     },
-    headerSection: {
-      marginBottom: 10,
+    content: {
+      flex: 1,
     },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: theme.colors.onSurface,
-      marginBottom: 16,
-      textAlign: 'center',
-      marginTop: 16,
-    },
-    section: {
-      marginBottom: 16,
-    },
-    sectionLabel: {
-      color: theme.colors.secondary,
-      marginBottom: 8,
-      fontWeight: '500',
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: theme.colors.onSurface,
-      marginBottom: 8,
-    },
-    cardTitle: {
-      color: theme.colors.onSurface,
-      marginBottom: 12,
-    },
-    subSectionTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme.colors.onSurface,
-      marginTop: 8,
-      marginBottom: 4,
-    },
-    chipContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'flex-start',
-      marginBottom: 8,
-    },
-    chip: {
-      marginRight: 6,
-      marginBottom: 6,
-      backgroundColor: theme.colors.surfaceVariant,
-      height: 'auto', 
-      justifyContent: 'center', 
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-    },
-    effectChip: {
-      marginRight: 6,
-      marginBottom: 6,
-      height: 'auto',
-      justifyContent: 'center',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-    },
-    chipText: {
-      color: theme.colors.onSurface,
-      fontSize: 12, 
-      textAlign: 'center', 
-      flexWrap: 'wrap', 
-    },
-    divider: {
-      backgroundColor: theme.colors.outline,
-      marginVertical: 16,
-      height: 0.5,
-    },
-    card: {
-      marginVertical: 8,
-      borderRadius: 12,
-      backgroundColor: theme.colors.surface,
-      overflow: 'hidden',
-    },
-    paragraph: {
-      color: theme.colors.onSurface,
-      fontSize: 14,
-      lineHeight: 20,
-    },
-    chartStyle: {
-      marginVertical: 8,
-      borderRadius: 8,
-    },
-    durationInfo: {
-      marginTop: 12,
-    },
-    durationItem: {
+    sectionHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 4,
+      marginBottom: 16,
+      gap: 12,
     },
-    durationIcon: {
-      backgroundColor: theme.colors.surfaceVariant,
-      marginRight: 8,
-    },
-    durationText: {
+    sectionTitle: {
       color: theme.colors.onSurface,
+      fontSize: 20,
+      fontWeight: '600',
+    },
+    summaryCard: {
+      margin: 16,
+      marginTop: 0,
+      borderRadius: 16,
+    },
+    categoryContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 16,
+    },
+    categoryChip: {
+      borderRadius: 16,
+    },
+    categoryChipText: {
+      color: '#FFFFFF',
+    },
+    summary: {
+      fontSize: 16,
+      lineHeight: 24,
+      color: theme.colors.onSurfaceVariant,
+    },
+    aliasesContainer: {
+      marginTop: 16,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    aliasesLabel: {
+      fontWeight: 'bold',
+      marginRight: 8,
+      color: theme.colors.onSurface,
+    },
+    aliases: {
+      flex: 1,
+      color: theme.colors.onSurfaceVariant,
+    },
+    timelineCard: {
+      margin: 16,
+      borderRadius: 16,
+    },
+    timeline: {
+      flexDirection: 'row',
+      height: 100,
+      gap: 8,
+    },
+    timelinePhase: {
+      alignItems: 'center',
+    },
+    timelineBar: {
+      flex: 1,
+      width: '100%',
+      justifyContent: 'center',
+    },
+    progressBar: {
+      height: 8,
+      borderRadius: 4,
+    },
+    timelineLabel: {
       fontSize: 12,
+      textAlign: 'center',
+      marginTop: 8,
+      color: theme.colors.onSurfaceVariant,
+    },
+    timelineInfo: {
+      marginTop: 16,
+      gap: 8,
+    },
+    infoItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    infoText: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 14,
+    },
+    effectsCard: {
+      margin: 16,
+      borderRadius: 16,
+    },
+    effectsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    effectItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      width: '45%',
+    },
+    effectText: {
+      color: theme.colors.onSurface,
+      fontSize: 14,
+      flex: 1,
+    },
+    doseCard: {
+      margin: 16,
+      borderRadius: 16,
     },
     doseSection: {
-      marginTop: 8,
+      marginBottom: 24,
     },
-    comboCard: {
+    doseRoute: {
+      color: theme.colors.primary,
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    doseGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 16,
+    },
+    doseItem: {
+      flex: 1,
+      minWidth: '45%',
       backgroundColor: theme.colors.surfaceVariant,
-      marginBottom: 12,
       padding: 12,
-      borderLeftWidth: 4,
-      borderRadius: 8,
+      borderRadius: 12,
+    },
+    doseClassification: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 12,
+      marginBottom: 4,
+    },
+    doseAmount: {
+      color: theme.colors.onSurface,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    doseNote: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 16,
+      padding: 12,
+      backgroundColor: theme.colors.errorContainer,
+      borderRadius: 12,
+    },
+    doseNoteText: {
+      color: theme.colors.onErrorContainer,
+      fontSize: 14,
+      flex: 1,
+    },
+    combosCard: {
+      margin: 16,
+      borderRadius: 16,
+    },
+    combosGrid: {
+      gap: 12,
+    },
+    comboItem: {
+      padding: 16,
+      borderRadius: 12,
     },
     comboHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 4,
+      gap: 12,
     },
-    comboIcon: {
-      backgroundColor: 'transparent',
-      marginRight: 8,
-    },
-    comboDrugName: {
-      color: theme.colors.onSurface,
+    comboDrug: {
+      flex: 1,
+      color: theme.colors.surface,
       fontSize: 16,
-      fontWeight: 'bold',
+      fontWeight: '600',
     },
     comboStatus: {
-      color: theme.colors.onSurface,
-      fontSize: 14,
-      marginBottom: 4,
+      backgroundColor: 'rgba(255,255,255,0.2)',
     },
     comboNote: {
-      color: theme.colors.onSurfaceVariant,
-      fontSize: 12,
-      fontStyle: 'italic',
-    },
-    sourcesSection: {
       marginTop: 8,
-    },
-    sourcesTitle: {
-      color: theme.colors.onSurface,
+      color: theme.colors.surface,
       fontSize: 14,
-      marginBottom: 4,
     },
-    sourceLink: {
-      color: theme.colors.primary,
-      fontSize: 13,
-      marginLeft: 8,
-      marginBottom: 2,
+    linksCard: {
+      margin: 16,
+      borderRadius: 16,
     },
-    linkButton: {
+    linkItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 8,
+      gap: 12,
+      paddingVertical: 12,
     },
     linkText: {
       color: theme.colors.primary,
-      fontSize: 14,
-      marginLeft: 8,
-    },
-    closeButton: {
-      alignItems: 'center',
-      marginTop: 20,
-    },
-    closeButtonText: {
-      color: theme.colors.onSurface,
       fontSize: 16,
-      marginTop: 4,
     },
-    fab: {
-      position: 'absolute',
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      color: theme.colors.onSurface,
+    },
+    chartCard: {
       margin: 16,
-      right: 0,
-      bottom: 0,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surface,
+    },
+    chartTitle: {
+      marginBottom: 16,
+      color: theme.colors.onSurface,
+    },
+    chart: {
+      borderRadius: 8,
+      marginVertical: 8,
     },
   });
 

@@ -2,11 +2,14 @@ name: ESLint
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - '**'  
   pull_request:
-    branches: [ main ]
-  # Allow manual trigger from Actions tab
   workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   lint:
@@ -23,13 +26,17 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm install -g expo-cli @expo/cli
 
-      - name: Run ESLint
+      - name: Run Expo Lint
+        run: npx eslint . --max-warnings=50
+
+      - name: Generate SARIF report
         run: npx eslint . --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif
-        continue-on-error: true
 
-      - name: Upload ESLint analysis results
+      - name: Upload analysis results
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: eslint-results.sarif

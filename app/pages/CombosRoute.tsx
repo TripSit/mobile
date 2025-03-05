@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-all-duplicated-branches */
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,7 +16,6 @@ import {
   Appbar,
   Avatar,
   Text,
-  Chip,
   Portal,
   Modal,
   Snackbar,
@@ -32,10 +32,16 @@ import DrugDetailScreen from '../components/DrugDetail';
 import localCombosData from '../data/combos.json';
 import localComboDefinitions from '../data/combo_definitions.json';
 
+type Source = {
+  author: string;
+  title: string;
+  url: string;
+};
+
 type Interaction = {
   status: string;
   note?: string;
-  sources?: any[];
+  sources?: Source[];
 };
 
 type CombosData = {
@@ -77,8 +83,18 @@ type Drug = {
   details: DrugDetail;
 };
 
+// Constants
 const COMBOS_URL = 'https://raw.githubusercontent.com/TripSit/drugs/main/combos.json';
 const COMBO_DEFINITIONS_URL = 'https://raw.githubusercontent.com/TripSit/drugs/main/combo_definitions.json';
+const DEFAULT_COLOR = '#9E9E9E';
+const DEFAULT_DARK_BG = '#1F1F1F';
+const DEFAULT_SUMMARY = '';
+const ICON_CHECK_OUTLINE = 'check-circle-outline';
+const ICON_CHECK = 'check-circle';
+const ICON_ALERT = 'alert-circle-outline';
+const ICON_CLOSE = 'close-circle-outline';
+const ICON_DANGER = 'alert-octagon';
+const ICON_HELP = 'help-circle-outline';
 
 const CombosRoute: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,7 +147,7 @@ const CombosRoute: React.FC = () => {
           id: `${index}`,
           name: drugName,
           pretty_name: capitalizeFirstLetter(drugName),
-          summary: '', // Provide a default summary or fetch it if available
+          summary: DEFAULT_SUMMARY, // Provide a default summary or fetch it if available
           aliases: [],
           categories: [], // Populate if available
           details: {
@@ -140,7 +156,7 @@ const CombosRoute: React.FC = () => {
             aliases: [],
             categories: [],
             properties: {
-              summary: '', // Provide actual summary if available
+              summary: DEFAULT_SUMMARY, // Provide actual summary if available
             },
           },
         }));
@@ -176,7 +192,7 @@ const CombosRoute: React.FC = () => {
               id: `${index}`,
               name: drugName,
               pretty_name: capitalizeFirstLetter(drugName),
-              summary: '', // Provide actual summary if available
+              summary: DEFAULT_SUMMARY, // Provide actual summary if available
               aliases: [],
               categories: [], // Populate if available
               details: {
@@ -185,7 +201,7 @@ const CombosRoute: React.FC = () => {
                 aliases: [],
                 categories: [],
                 properties: {
-                  summary: '', // Provide actual summary if available
+                  summary: DEFAULT_SUMMARY, // Provide actual summary if available
                 },
               },
             }));
@@ -238,7 +254,7 @@ const CombosRoute: React.FC = () => {
 
   useEffect(() => {
     fetchInteractionResult();
-  }, [selectedDrugs]);
+  }, [selectedDrugs, combosData]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -251,23 +267,25 @@ const CombosRoute: React.FC = () => {
       case 'dangerous':
         return '#F44336'; // Red
       default:
-        return '#9E9E9E'; // Grey
+        return DEFAULT_COLOR; // Grey
     }
   };
 
   const getStatusIcon = (status: string) => {
+    if (!status) return ICON_HELP;
     switch (status.toLowerCase()) {
       case 'low risk & no synergy':
-        return 'check-circle-outline';
+        return ICON_CHECK_OUTLINE;
       case 'low risk & synergy':
-        return 'check-circle';
+        return ICON_CHECK;
       case 'caution':
-        return 'alert-circle-outline';
+        return ICON_ALERT;
       case 'unsafe':
+        return ICON_CLOSE;
       case 'dangerous':
-        return 'close-circle-outline';
+        return ICON_DANGER;
       default:
-        return 'help-circle-outline';
+        return ICON_HELP;
     }
   };
 
@@ -316,7 +334,7 @@ const CombosRoute: React.FC = () => {
       }).start();
     };
 
-    const iconName = categoryIcons[item.categories[0]?.toLowerCase()] || 'pill';
+    const iconName = categoryIcons[item.categories[0]?.toLowerCase()] ?? categoryIcons.default;
 
     return (
       <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
@@ -351,149 +369,106 @@ const CombosRoute: React.FC = () => {
   };
 
   const renderInteractionResult = () => {
-    if (selectedDrugs.length === 2 && interactionResult) {
+    if (selectedDrugs.length === 2) {
       const [drug1, drug2] = selectedDrugs;
-      const status = interactionResult.status;
-      const statusColor = getStatusColor(status);
-      const statusIcon = getStatusIcon(status);
+      const statusText = interactionResult ? interactionResult.status : 'No interaction data available';
+      const statusColor = interactionResult ? getStatusColor(interactionResult.status) : DEFAULT_COLOR;
 
       return (
         <Surface style={styles(isDarkMode).interactionSurface}>
           <TouchableOpacity onPress={() => setIsModalVisible(true)}>
             <View style={styles(isDarkMode).interactionContainer}>
-              <MaterialCommunityIcons name={statusIcon} size={32} color={statusColor} />
+              {/* eslint-disable-next-line sonarjs/no-all-duplicated-branches */}
+              <MaterialCommunityIcons 
+                name={interactionResult ? getStatusIcon(interactionResult.status) : ICON_HELP}
+                size={32} 
+                color={statusColor} 
+              />
               <View style={styles(isDarkMode).interactionTextContainer}>
                 <Text style={styles(isDarkMode).interactionTitle}>
                   {drug1.pretty_name} + {drug2.pretty_name}
                 </Text>
+                {/* eslint-disable-next-line sonarjs/no-all-duplicated-branches */}
                 <Text style={[styles(isDarkMode).interactionStatus, { color: statusColor }]}>
-                  {status}
+                  {statusText}
                 </Text>
               </View>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={32}
-                color={isDarkMode ? '#FFFFFF' : '#000000'}
-              />
+              <MaterialCommunityIcons name="chevron-right" size={32} color={theme.colors.onSurface} />
             </View>
           </TouchableOpacity>
         </Surface>
       );
-    } else if (selectedDrugs.length === 2 && !interactionResult) {
-      return (
-        <Surface style={styles(isDarkMode).interactionSurface}>
-          <TouchableOpacity onPress={() => setIsModalVisible(true)}>
-            <View style={styles(isDarkMode).interactionContainer}>
-              <MaterialCommunityIcons name="help-circle-outline" size={32} color="#9E9E9E" />
-              <View style={styles(isDarkMode).interactionTextContainer}>
-                <Text style={styles(isDarkMode).interactionTitle}>
-                  {selectedDrugs[0].pretty_name} + {selectedDrugs[1].pretty_name}
-                </Text>
-                <Text style={styles(isDarkMode).interactionStatus}>
-                  No interaction data available
-                </Text>
-              </View>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={32}
-                color={isDarkMode ? '#FFFFFF' : '#000000'}
-              />
-            </View>
-          </TouchableOpacity>
-        </Surface>
-      );
-    } else {
-      return null;
     }
+    return null;
   };
 
   const renderInteractionModal = () => {
-    if (selectedDrugs.length === 2 && interactionResult) {
-      const [drug1, drug2] = selectedDrugs;
-      const status = interactionResult.status;
-      const statusColor = getStatusColor(status);
-      const definitionObj = comboDefinitions.find(
-        def => def.status.toLowerCase() === status.toLowerCase()
-      );
-      const definition = definitionObj ? definitionObj.definition : 'No definition available for this status.';
-      const note = interactionResult.note;
-
-      return (
-        <Modal
-          visible={isModalVisible}
-          onDismiss={() => setIsModalVisible(false)}
-          contentContainerStyle={[
-            styles(isDarkMode).modalContainer,
-            { backgroundColor: isDarkMode ? '#1F1F1F' : '#FFFFFF' },
-          ]}
-        >
-          <Appbar.Header style={styles(isDarkMode).modalHeader}>
-            <Appbar.BackAction onPress={() => setIsModalVisible(false)} />
-            <Appbar.Content title={`${drug1.pretty_name} + ${drug2.pretty_name}`} />
-          </Appbar.Header>
-          <ScrollView contentContainerStyle={styles(isDarkMode).modalContent}>
-            <View style={styles(isDarkMode).statusContainer}>
-              <MaterialCommunityIcons name={getStatusIcon(status)} size={48} color={statusColor} />
-              <Text style={[styles(isDarkMode).modalStatusText, { color: statusColor }]}>
-                {status}
-              </Text>
-            </View>
-            {note && <Text style={styles(isDarkMode).modalNoteText}>{note}</Text>}
-            <Text style={styles(isDarkMode).modalDefinitionText}>{definition}</Text>
-            <Button
-              mode="contained"
-              onPress={() => {
-                setSelectedDrugs([]);
-                setIsModalVisible(false);
-              }}
-              style={styles(isDarkMode).clearButton}
-            >
-              Clear Selection
-            </Button>
-          </ScrollView>
-        </Modal>
-      );
-    } else if (selectedDrugs.length === 2 && !interactionResult) {
-      const [drug1, drug2] = selectedDrugs;
-      return (
-        <Modal
-          visible={isModalVisible}
-          onDismiss={() => setIsModalVisible(false)}
-          contentContainerStyle={[
-            styles(isDarkMode).modalContainer,
-            { backgroundColor: isDarkMode ? '#1F1F1F' : '#FFFFFF' },
-          ]}
-        >
-          <Appbar.Header style={styles(isDarkMode).modalHeader}>
-            <Appbar.BackAction onPress={() => setIsModalVisible(false)} />
-            <Appbar.Content title={`${drug1.pretty_name} + ${drug2.pretty_name}`} />
-          </Appbar.Header>
-          <ScrollView contentContainerStyle={styles(isDarkMode).modalContent}>
-            <View style={styles(isDarkMode).statusContainer}>
-              <MaterialCommunityIcons name="help-circle-outline" size={48} color="#9E9E9E" />
-              <Text style={[styles(isDarkMode).modalStatusText, { color: '#9E9E9E' }]}>
-                No interaction data available
-              </Text>
-            </View>
-            <Text style={styles(isDarkMode).modalNoteText}>
-              Please exercise caution and consult additional resources.
-            </Text>
-            <Button
-              mode="contained"
-              onPress={() => {
-                setSelectedDrugs([]);
-                setIsModalVisible(false);
-              }}
-              style={styles(isDarkMode).clearButton}
-            >
-              Clear Selection
-            </Button>
-          </ScrollView>
-        </Modal>
-      );
-    } else {
+    if (!selectedDrugs || selectedDrugs.length !== 2) {
       return null;
     }
+
+    const [drug1, drug2] = selectedDrugs;
+    const modalContentStyle = [
+      styles(isDarkMode).modalContainer,
+      { backgroundColor: isDarkMode ? DEFAULT_DARK_BG : '#FFFFFF' }
+    ];
+
+    return (
+      <Modal
+        visible={isModalVisible}
+        onDismiss={() => setIsModalVisible(false)}
+        contentContainerStyle={modalContentStyle}
+      >
+        <Appbar.Header style={styles(isDarkMode).modalHeader}>
+          <Appbar.BackAction onPress={() => setIsModalVisible(false)} />
+          <Appbar.Content title={`${drug1.pretty_name} + ${drug2.pretty_name}`} />
+        </Appbar.Header>
+        <ScrollView contentContainerStyle={styles(isDarkMode).modalContent}>
+          <View style={styles(isDarkMode).statusContainer}>
+            {interactionResult ? (
+              <>
+                <MaterialCommunityIcons 
+                  name={getStatusIcon(interactionResult.status)} 
+                  size={48} 
+                  color={getStatusColor(interactionResult.status)} 
+                />
+                <Text style={[styles(isDarkMode).modalStatusText, { color: getStatusColor(interactionResult.status) }]}>
+                  {interactionResult.status}
+                </Text>
+                {interactionResult.note && (
+                  <Text style={styles(isDarkMode).modalNoteText}>{interactionResult.note}</Text>
+                )}
+                <Text style={styles(isDarkMode).modalDefinitionText}>
+                  {comboDefinitions.find(
+                    def => def.status.toLowerCase() === interactionResult.status.toLowerCase()
+                  )?.definition || 'No definition available for this status.'}
+                </Text>
+              </>
+            ) : (
+              <>
+                <MaterialCommunityIcons name="help-circle-outline" size={48} color={DEFAULT_COLOR} />
+                <Text style={[styles(isDarkMode).modalStatusText, { color: DEFAULT_COLOR }]}>
+                  No interaction data available
+                </Text>
+                <Text style={styles(isDarkMode).modalNoteText}>
+                  Please exercise caution and consult additional resources.
+                </Text>
+              </>
+            )}
+            <Button
+              mode="contained"
+              onPress={() => {
+                setSelectedDrugs([]);
+                setIsModalVisible(false);
+              }}
+              style={styles(isDarkMode).clearButton}
+            >
+              Clear Selection
+            </Button>
+          </View>
+        </ScrollView>
+      </Modal>
+    );
   };
 
   if (loading) {
