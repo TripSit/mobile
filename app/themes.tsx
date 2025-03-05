@@ -69,6 +69,14 @@ export const darkTheme = {
     inversePrimary: '#6750A4',
     shadow: '#000000',
     surfaceTint: '#D0BCFF',
+    elevation: {
+      level0: 'transparent',
+      level1: '#27262a',
+      level2: '#2d2c30',
+      level3: '#333236',
+      level4: '#383739',
+      level5: '#3d3c3f',
+    },
   },
 };
 
