@@ -6,12 +6,18 @@ import { lightTheme, darkTheme } from './themes';
 import HomeScreen from './pages/HomeScreen';
 import { createSharedElementStackNavigator } from 'react-navigation-shared-element';
 import DrugDetailScreen from './components/DrugDetail';
+import { initializeAnalytics } from './utils/analytics';
 
 const Stack = createSharedElementStackNavigator();
 
 export default function Index() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? darkTheme : lightTheme;
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
+
+  // Initialize analytics when the app starts
+  React.useEffect(() => {
+    initializeAnalytics();
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

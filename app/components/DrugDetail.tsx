@@ -47,6 +47,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format, formatDistanceToNow } from 'date-fns';
+import { useAnalytics } from '../hooks/useAnalytics'
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -115,6 +116,13 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
   const scrollY = useSharedValue(0);
 
   const drugDetails = drug.details;
+
+  const { logScreen, logAction } = useAnalytics()
+
+  // Log screen view
+  useEffect(() => {
+    logScreen('DrugDetail', { drugName: drug?.name })
+  }, [drug])
 
   useEffect(() => {
     const getLastUpdated = async () => {
@@ -591,6 +599,13 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
       scrollY.value = event.contentOffset.y;
     },
   });
+
+  const handleInteraction = (interactionType: string) => {
+    logAction('Drug Interaction', 'Drug Detail', {
+      drugName: drug?.name,
+      interactionType,
+    })
+  }
 
   if (!drugDetails) {
     return (
