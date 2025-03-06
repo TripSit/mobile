@@ -3,27 +3,50 @@ import Constants from 'expo-constants'
 import * as Application from 'expo-application'
 import * as Device from 'expo-device'
 import { Platform } from 'react-native'
+import { usePathname, useSegments } from 'expo-router'
+import { useEffect } from 'react'
 
-// Create PostHog instance
-let posthog: PostHog | null = null
+const API_KEY = Constants.expoConfig?.extra?.posthogPublicKey
+const API_HOST = Constants.expoConfig?.extra?.posthogHost
+
+if (!API_KEY) {
+  console.error('PostHog API key is missing!')
+}
+
+// Create PostHog instance with API key and host
+const posthogClient = new PostHog(API_KEY!, {
+  host: API_HOST,
+  sendFeatureFlagEvent: true,
+  preloadFeatureFlags: true,
+})
+
+// Hook for tracking screen views with Expo Router
+export function useScreenTracking() {
+  const pathname = usePathname()
+  const segments = useSegments()
+
+  useEffect(() => {
+    if (pathname) {
+      Analytics.trackScreen(pathname)
+    }
+  }, [pathname, segments])
+}
 
 // Analytics class
 class Analytics {
   static async initialize() {
     try {
-      posthog = new PostHog(
-        Constants.expoConfig?.extra?.EXPO_PUBLIC_POSTHOG_API_KEY || process.env.EXPO_PUBLIC_POSTHOG_API_KEY!,
-        {
-          host: Constants.expoConfig?.extra?.EXPO_PUBLIC_POSTHOG_HOST || process.env.EXPO_PUBLIC_POSTHOG_HOST!,
-          sendFeatureFlagEvent: true,
-          preloadFeatureFlags: true,
-        }
-      )
+      if (!API_KEY || !API_HOST) {
+        console.warn('PostHog configuration is missing')
+        return
+      }
 
       // Set initial device properties
       const deviceId = await Analytics.getDeviceId()
       const deviceProps = await Analytics.getDeviceProperties()
-      await posthog?.identify(deviceId, deviceProps)
+      await posthogClient.identify(deviceId, deviceProps)
+
+      console.log('PostHog initialized successfully')
 
       // Track initial app launch
       Analytics.trackEvent('App Launched')
@@ -64,25 +87,25 @@ class Analytics {
   }
 
   static trackScreen(screenName: string, properties?: Record<string, any>) {
-    posthog?.screen(screenName, {
+    posthogClient.screen(screenName, {
       ...properties,
       timestamp: new Date().toISOString(),
     })
   }
 
   static trackEvent(eventName: string, properties?: Record<string, any>) {
-    posthog?.capture(eventName, {
+    posthogClient.capture(eventName, {
       ...properties,
       timestamp: new Date().toISOString(),
     })
   }
 
   static setUserProperties(properties: Record<string, any>) {
-    posthog?.register(properties)
+    posthogClient.register(properties)
   }
 
   static trackError(error: Error, additionalProperties?: Record<string, any>) {
-    posthog?.capture('Error', {
+    posthogClient.capture('Error', {
       error_name: error.name,
       error_message: error.message,
       error_stack: error.stack,
@@ -92,7 +115,7 @@ class Analytics {
   }
 
   static async getFeatureFlag(flagName: string) {
-    return await posthog?.getFeatureFlag(flagName)
+    return await posthogClient.getFeatureFlag(flagName)
   }
 
   static startSession() {
