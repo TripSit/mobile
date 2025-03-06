@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   useColorScheme,
-  Animated,
   ScrollView,
+  Dimensions,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
 import {
   Searchbar,
@@ -21,10 +23,25 @@ import {
   Snackbar,
   Button,
   Surface,
+  useTheme,
+  IconButton,
+  Divider,
+  Chip,
 } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { useTheme } from '@react-navigation/native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  SlideInUp,
+  SlideOutDown,
+  withSpring,
+  useAnimatedStyle,
+  withTiming,
+  useSharedValue,
+  interpolate,
+  Extrapolate,
+} from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DrugDetailScreen from '../components/DrugDetail';
 
@@ -96,6 +113,56 @@ const ICON_CLOSE = 'close-circle-outline';
 const ICON_DANGER = 'alert-octagon';
 const ICON_HELP = 'help-circle-outline';
 
+const AnimatedSurface = Animated.createAnimatedComponent(Surface);
+const AnimatedCard = Animated.createAnimatedComponent(Card);
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
+
+interface Styles {
+  container: ViewStyle;
+  header: ViewStyle;
+  headerContent: ViewStyle;
+  headerTitle: TextStyle;
+  headerSubtitle: TextStyle;
+  clearButton: ViewStyle;
+  searchContainer: ViewStyle;
+  searchBar: ViewStyle;
+  searchInput: TextStyle;
+  listContainer: ViewStyle;
+  drugCardContainer: ViewStyle;
+  drugCard: ViewStyle;
+  selectedCard: ViewStyle;
+  drugCardContent: ViewStyle;
+  drugTextContainer: ViewStyle;
+  drugTitle: TextStyle;
+  selectedIconContainer: ViewStyle;
+  interactionCard: ViewStyle;
+  interactionCardContent: ViewStyle;
+  interactionHeader: ViewStyle;
+  drugPillsContainer: ViewStyle;
+  drugPill: ViewStyle;
+  statusContainer: ViewStyle;
+  interactionStatus: TextStyle;
+  snackbar: ViewStyle;
+  modalContainer: ViewStyle;
+  modalHeader: ViewStyle;
+  modalContent: ViewStyle;
+  modalCard: ViewStyle;
+  modalStatusSection: ViewStyle;
+  modalDivider: ViewStyle;
+  modalDetailsSection: ViewStyle;
+  modalSectionTitle: TextStyle;
+  modalStatusText: TextStyle;
+  modalNoteText: TextStyle;
+  modalDefinitionText: TextStyle;
+  modalActionsSection: ViewStyle;
+  modalButton: ViewStyle;
+  drugDetailModal: ViewStyle;
+  loadingContainer: ViewStyle;
+  loadingText: TextStyle;
+}
+
 const CombosRoute: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDrugs, setSelectedDrugs] = useState<Drug[]>([]);
@@ -112,6 +179,43 @@ const CombosRoute: React.FC = () => {
   const theme = useTheme();
 
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  // Animation values
+  const searchBarHeight = useSharedValue(56);
+  const headerScale = useSharedValue(1);
+  const listScale = useSharedValue(1);
+  const interactionCardHeight = useSharedValue(0);
+
+  const searchBarStyle = useAnimatedStyle(() => ({
+    height: searchBarHeight.value,
+    opacity: interpolate(searchBarHeight.value, [0, 56], [0, 1], Extrapolate.CLAMP),
+    transform: [
+      {
+        translateY: interpolate(searchBarHeight.value, [0, 56], [-20, 0], Extrapolate.CLAMP),
+      },
+    ],
+  }));
+
+  const headerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: headerScale.value }],
+  }));
+
+  const listStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: listScale.value }],
+  }));
+
+  const interactionCardStyle = useAnimatedStyle(() => ({
+    height: interactionCardHeight.value,
+    opacity: interpolate(interactionCardHeight.value, [0, 150], [0, 1], Extrapolate.CLAMP),
+  })) as any;
+
+  useEffect(() => {
+    if (selectedDrugs.length === 2) {
+      interactionCardHeight.value = withSpring(110); // Increased height for larger card
+    } else {
+      interactionCardHeight.value = withSpring(0);
+    }
+  }, [selectedDrugs]);
 
   // Function to capitalize the first letter
   const capitalizeFirstLetter = (string: string) => {
@@ -289,117 +393,156 @@ const CombosRoute: React.FC = () => {
     }
   };
 
-  const categoryIcons: { [key: string]: string } = {
-    depressant: 'sleep',
-    psychedelic: 'brain',
-    stimulant: 'flash',
-    opioid: 'needle',
-    cannabinoid: 'leaf',
-    dissociative: 'cloud',
-    deliriant: 'ghost',
-    nootropic: 'school',
-    'research chemical': 'flask',
-    antidepressant: 'emoticon-happy',
-    antipsychotic: 'emoticon-neutral',
-    benzodiazepine: 'sleep',
-    ssri: 'emoticon-neutral',
-    maoi: 'food-apple',
-    vitamin: 'pill',
-    entactogen: 'heart',
-    alcohol: 'glass-wine',
-    gabaergic: 'sleep',
-    steroid: 'dumbbell',
-    unclassified: 'help-circle',
-    'habit-forming': 'alert',
-    default: 'pill',
+  const getIconForCategory = (category: string): IconName => {
+    const iconMap: { [key: string]: IconName } = {
+      depressant: 'sleep',
+      psychedelic: 'brain',
+      stimulant: 'flash',
+      opioid: 'needle',
+      cannabinoid: 'leaf',
+      dissociative: 'cloud',
+      deliriant: 'ghost',
+      nootropic: 'school',
+      'research chemical': 'flask',
+      antidepressant: 'emoticon-happy',
+      antipsychotic: 'emoticon-neutral',
+      benzodiazepine: 'sleep',
+      ssri: 'emoticon-neutral',
+      maoi: 'food-apple',
+      vitamin: 'pill',
+      entactogen: 'heart',
+      alcohol: 'glass-wine',
+      gabaergic: 'sleep',
+      steroid: 'dumbbell',
+      unclassified: 'help-circle',
+      'habit-forming': 'alert',
+      default: 'pill',
+    } as const;
+    return iconMap[category.toLowerCase()] || iconMap.default;
   };
 
-  const renderDrug = ({ item }: { item: Drug }) => {
+  const renderDrug = ({ item, index }: { item: Drug; index: number }) => {
     const isSelected = selectedDrugs.some(drug => drug.name === item.name);
-    const scaleValue = new Animated.Value(1);
-
-    const onPressIn = () => {
-      Animated.spring(scaleValue, {
-        toValue: 0.95,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const onPressOut = () => {
-      Animated.spring(scaleValue, {
-        toValue: 1,
-        friction: 3,
-        tension: 40,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const iconName = categoryIcons[item.categories[0]?.toLowerCase()] ?? categoryIcons.default;
 
     return (
-      <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
+      <Animated.View
+        entering={FadeIn.delay(index * 50).springify()}
+        exiting={FadeOut}
+      >
         <TouchableOpacity
           onPress={() => toggleDrugSelection(item)}
           onLongPress={() => setSelectedDrugDetail(item)}
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
+          style={styles(isDarkMode, theme).drugCardContainer}
         >
-          <Card
+          <AnimatedCard
             style={[
-              styles(isDarkMode).card,
-              isSelected && { borderColor: theme.colors.primary },
+              styles(isDarkMode, theme).drugCard,
+              isSelected && styles(isDarkMode, theme).selectedCard,
             ]}
+            mode="elevated"
           >
-            <Card.Title
-              title={item.pretty_name}
-              titleStyle={styles(isDarkMode).title}
-              left={props => (
-                <Avatar.Icon
-                  {...props}
-                  icon={iconName}
-                  color="#FFFFFF"
-                  style={{ backgroundColor: theme.colors.primary }}
-                />
+            <View style={styles(isDarkMode, theme).drugCardContent}>
+              <View style={styles(isDarkMode, theme).drugTextContainer}>
+                <Text 
+                  variant="titleMedium" 
+                  style={[
+                    styles(isDarkMode, theme).drugTitle,
+                    isSelected && { color: theme.colors.primary }
+                  ]}
+                >
+                  {item.pretty_name}
+                </Text>
+              </View>
+              {isSelected && (
+                <View style={styles(isDarkMode, theme).selectedIconContainer}>
+                  <MaterialCommunityIcons
+                    name="check-circle"
+                    size={24}
+                    color={theme.colors.primary}
+                  />
+                </View>
               )}
-            />
-          </Card>
+            </View>
+          </AnimatedCard>
         </TouchableOpacity>
       </Animated.View>
     );
   };
 
   const renderInteractionResult = () => {
-    if (selectedDrugs.length === 2) {
-      const [drug1, drug2] = selectedDrugs;
-      const statusText = interactionResult ? interactionResult.status : 'No interaction data available';
-      const statusColor = interactionResult ? getStatusColor(interactionResult.status) : DEFAULT_COLOR;
+    if (selectedDrugs.length !== 2) return null;
 
-      return (
-        <Surface style={styles(isDarkMode).interactionSurface}>
-          <TouchableOpacity onPress={() => setIsModalVisible(true)}>
-            <View style={styles(isDarkMode).interactionContainer}>
-              {/* eslint-disable-next-line sonarjs/no-all-duplicated-branches */}
-              <MaterialCommunityIcons 
-                name={interactionResult ? getStatusIcon(interactionResult.status) : ICON_HELP}
-                size={32} 
-                color={statusColor} 
+    const [drug1, drug2] = selectedDrugs;
+    const statusText = interactionResult?.status || 'No interaction data available';
+    const statusColor = interactionResult ? getStatusColor(interactionResult.status) : DEFAULT_COLOR;
+    const statusIcon = interactionResult ? getStatusIcon(interactionResult.status) : ICON_HELP;
+
+    return (
+      <AnimatedSurface
+        style={[
+          styles(isDarkMode, theme).interactionCard as any,
+          interactionCardStyle,
+        ]}
+        elevation={8}
+      >
+        <TouchableOpacity 
+          onPress={() => setIsModalVisible(true)}
+          style={styles(isDarkMode, theme).interactionCardContent}
+        >
+          <View style={styles(isDarkMode, theme).interactionHeader}>
+            <View style={styles(isDarkMode, theme).drugPillsContainer}>
+              <Chip 
+                mode="flat" 
+                style={styles(isDarkMode, theme).drugPill}
+                compact
+                textStyle={{ fontSize: Math.min(16, SCREEN_WIDTH * 0.04) }}
+              >
+                {drug1.pretty_name}
+              </Chip>
+              <MaterialCommunityIcons
+                name="plus"
+                size={20}
+                color={theme.colors.onSurfaceVariant}
+                style={{ width: 20, height: 20, alignSelf: 'center' }}
               />
-              <View style={styles(isDarkMode).interactionTextContainer}>
-                <Text style={styles(isDarkMode).interactionTitle}>
-                  {drug1.pretty_name} + {drug2.pretty_name}
-                </Text>
-                {/* eslint-disable-next-line sonarjs/no-all-duplicated-branches */}
-                <Text style={[styles(isDarkMode).interactionStatus, { color: statusColor }]}>
-                  {statusText}
-                </Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={32} color={theme.colors.onSurface} />
+              <Chip 
+                mode="flat" 
+                style={styles(isDarkMode, theme).drugPill}
+                compact
+                textStyle={{ fontSize: Math.min(16, SCREEN_WIDTH * 0.04) }}
+              >
+                {drug2.pretty_name}
+              </Chip>
             </View>
-          </TouchableOpacity>
-        </Surface>
-      );
-    }
-    return null;
+            <View style={styles(isDarkMode, theme).statusContainer}>
+              <MaterialCommunityIcons 
+                name={statusIcon} 
+                size={28} 
+                color={statusColor}
+                style={{ width: 28, height: 28, alignSelf: 'center' }}
+              />
+              <Text 
+                variant="titleLarge" 
+                style={[
+                  styles(isDarkMode, theme).interactionStatus, 
+                  { color: statusColor }
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {statusText}
+              </Text>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={24}
+                color={theme.colors.onSurfaceVariant}
+                style={{ width: 24, height: 24, alignSelf: 'center' }}
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </AnimatedSurface>
+    );
   };
 
   const renderInteractionModal = () => {
@@ -409,7 +552,7 @@ const CombosRoute: React.FC = () => {
 
     const [drug1, drug2] = selectedDrugs;
     const modalContentStyle = [
-      styles(isDarkMode).modalContainer,
+      styles(isDarkMode, theme).modalContainer,
       { backgroundColor: isDarkMode ? DEFAULT_DARK_BG : '#FFFFFF' }
     ];
 
@@ -419,53 +562,74 @@ const CombosRoute: React.FC = () => {
         onDismiss={() => setIsModalVisible(false)}
         contentContainerStyle={modalContentStyle}
       >
-        <Appbar.Header style={styles(isDarkMode).modalHeader}>
+        <Appbar.Header style={styles(isDarkMode, theme).modalHeader}>
           <Appbar.BackAction onPress={() => setIsModalVisible(false)} />
-          <Appbar.Content title={`${drug1.pretty_name} + ${drug2.pretty_name}`} />
+          <Appbar.Content title="Drug Interaction" subtitle={`${drug1.pretty_name} + ${drug2.pretty_name}`} />
         </Appbar.Header>
-        <ScrollView contentContainerStyle={styles(isDarkMode).modalContent}>
-          <View style={styles(isDarkMode).statusContainer}>
-            {interactionResult ? (
-              <>
-                <MaterialCommunityIcons 
-                  name={getStatusIcon(interactionResult.status)} 
-                  size={48} 
-                  color={getStatusColor(interactionResult.status)} 
-                />
-                <Text style={[styles(isDarkMode).modalStatusText, { color: getStatusColor(interactionResult.status) }]}>
-                  {interactionResult.status}
+        <ScrollView contentContainerStyle={styles(isDarkMode, theme).modalContent}>
+          <Surface style={styles(isDarkMode, theme).modalCard} elevation={0}>
+            <View style={styles(isDarkMode, theme).modalStatusSection}>
+              <MaterialCommunityIcons 
+                name={getStatusIcon(interactionResult?.status || '')} 
+                size={48} 
+                color={getStatusColor(interactionResult?.status || '')} 
+              />
+              <Text variant="headlineSmall" style={[
+                styles(isDarkMode, theme).modalStatusText,
+                { color: getStatusColor(interactionResult?.status || '') }
+              ]}>
+                {interactionResult?.status || 'No data available'}
+              </Text>
+            </View>
+
+            <Divider style={styles(isDarkMode, theme).modalDivider} />
+
+            <View style={styles(isDarkMode, theme).modalDetailsSection}>
+              {interactionResult?.note ? (
+                <>
+                  <Text variant="titleMedium" style={styles(isDarkMode, theme).modalSectionTitle}>
+                    Important Information
+                  </Text>
+                  <Text style={styles(isDarkMode, theme).modalNoteText}>
+                    {interactionResult.note}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles(isDarkMode, theme).modalNoteText}>
+                  No specific interaction information available. Please exercise caution and consult additional resources.
                 </Text>
-                {interactionResult.note && (
-                  <Text style={styles(isDarkMode).modalNoteText}>{interactionResult.note}</Text>
-                )}
-                <Text style={styles(isDarkMode).modalDefinitionText}>
-                  {comboDefinitions.find(
-                    def => def.status.toLowerCase() === interactionResult.status.toLowerCase()
-                  )?.definition || 'No definition available for this status.'}
-                </Text>
-              </>
-            ) : (
-              <>
-                <MaterialCommunityIcons name="help-circle-outline" size={48} color={DEFAULT_COLOR} />
-                <Text style={[styles(isDarkMode).modalStatusText, { color: DEFAULT_COLOR }]}>
-                  No interaction data available
-                </Text>
-                <Text style={styles(isDarkMode).modalNoteText}>
-                  Please exercise caution and consult additional resources.
-                </Text>
-              </>
-            )}
-            <Button
-              mode="contained"
-              onPress={() => {
-                setSelectedDrugs([]);
-                setIsModalVisible(false);
-              }}
-              style={styles(isDarkMode).clearButton}
-            >
-              Clear Selection
-            </Button>
-          </View>
+              )}
+
+              {interactionResult?.status && (
+                <>
+                  <Text variant="titleMedium" style={[
+                    styles(isDarkMode, theme).modalSectionTitle,
+                    { marginTop: 24 }
+                  ]}>
+                    What This Means
+                  </Text>
+                  <Text style={styles(isDarkMode, theme).modalDefinitionText}>
+                    {comboDefinitions.find(
+                      def => def.status.toLowerCase() === interactionResult.status.toLowerCase()
+                    )?.definition || 'No definition available for this status.'}
+                  </Text>
+                </>
+              )}
+            </View>
+
+            <View style={styles(isDarkMode, theme).modalActionsSection}>
+              <Button
+                mode="contained"
+                onPress={() => {
+                  setSelectedDrugs([]);
+                  setIsModalVisible(false);
+                }}
+                style={styles(isDarkMode, theme).modalButton}
+              >
+                Clear Selection
+              </Button>
+            </View>
+          </Surface>
         </ScrollView>
       </Modal>
     );
@@ -473,42 +637,69 @@ const CombosRoute: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles(isDarkMode).loadingContainer}>
+      <View style={styles(isDarkMode, theme).loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles(isDarkMode).loadingText}>Loading...</Text>
+        <Text style={styles(isDarkMode, theme).loadingText}>Loading...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles(isDarkMode).container}>
-      <Appbar.Header style={styles(isDarkMode).appBar}>
-        <Appbar.Content title="Drug Combinations" />
-      </Appbar.Header>
-      <Searchbar
-        placeholder="Search substances"
-        onChangeText={handleSearch}
-        value={searchQuery}
-        style={styles(isDarkMode).searchBar}
-        inputStyle={{ color: isDarkMode ? '#FFFFFF' : '#000000' }}
-        placeholderTextColor={isDarkMode ? '#888888' : '#888888'}
-        iconColor={isDarkMode ? '#FFFFFF' : '#000000'}
-      />
-      <FlatList
-        data={filteredDrugs}
-        keyExtractor={item => item.id}
-        renderItem={renderDrug}
-        contentContainerStyle={styles(isDarkMode).listContainer}
-      />
+    <View style={styles(isDarkMode, theme).container}>
+      <Animated.View style={headerStyle}>
+        <Surface style={styles(isDarkMode, theme).header} elevation={0}>
+          <View style={styles(isDarkMode, theme).headerContent}>
+            <Text variant="headlineMedium" style={styles(isDarkMode, theme).headerTitle}>
+              Drug Interactions
+            </Text>
+            {selectedDrugs.length > 0 && (
+              <IconButton
+                icon="close"
+                mode="contained-tonal"
+                onPress={() => setSelectedDrugs([])}
+                style={styles(isDarkMode, theme).clearButton}
+              />
+            )}
+          </View>
+          <Text variant="bodyMedium" style={styles(isDarkMode, theme).headerSubtitle}>
+            Select two substances to check their interaction
+          </Text>
+        </Surface>
+      </Animated.View>
+
+      <Animated.View style={[styles(isDarkMode, theme).searchContainer, searchBarStyle]}>
+        <Searchbar
+          placeholder="Search substances..."
+          onChangeText={handleSearch}
+          value={searchQuery}
+          style={styles(isDarkMode, theme).searchBar}
+          inputStyle={styles(isDarkMode, theme).searchInput}
+          elevation={0}
+          mode="bar"
+        />
+      </Animated.View>
+
+      <Animated.View style={[{ flex: 1 }, listStyle]}>
+        <FlatList
+          data={filteredDrugs}
+          renderItem={renderDrug}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles(isDarkMode, theme).listContainer}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+        />
+      </Animated.View>
+
       {renderInteractionResult()}
+
       <Portal>
         {renderInteractionModal()}
         <Modal
           visible={!!selectedDrugDetail}
           onDismiss={() => setSelectedDrugDetail(null)}
           contentContainerStyle={[
-            styles(isDarkMode).drugDetailModal,
-            { backgroundColor: isDarkMode ? '#1F1F1F' : '#FFFFFF' },
+            styles(isDarkMode, theme).drugDetailModal,
+            { backgroundColor: isDarkMode ? theme.colors.elevation.level2 : theme.colors.surface },
           ]}
         >
           {selectedDrugDetail && (
@@ -521,105 +712,201 @@ const CombosRoute: React.FC = () => {
           visible={snackbarVisible}
           onDismiss={() => setSnackbarVisible(false)}
           duration={3000}
+          style={styles(isDarkMode, theme).snackbar}
         >
-          You can only select two substances at a time.
+          You can only select two substances at a time
         </Snackbar>
       </Portal>
     </View>
   );
 };
 
-const styles = (isDarkMode: boolean) =>
-  StyleSheet.create({
+const styles = (isDarkMode: boolean, theme: any) =>
+  StyleSheet.create<Styles>({
     container: {
       flex: 1,
-      backgroundColor: isDarkMode ? '#121212' : '#FAFAFA',
+      backgroundColor: isDarkMode ? theme.colors.background : theme.colors.background,
     },
-    appBar: {
-      backgroundColor: isDarkMode ? '#1F1F1F' : '#6200EE',
+    header: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+      backgroundColor: 'transparent',
+    },
+    headerContent: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      color: isDarkMode ? theme.colors.onSurface : theme.colors.onSurface,
+      fontWeight: '700',
+    },
+    headerSubtitle: {
+      color: theme.colors.onSurfaceVariant,
+      marginTop: 4,
+    },
+    clearButton: {
+      margin: 0,
+    },
+    searchContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
     },
     searchBar: {
-      marginHorizontal: 10,
-      marginVertical: 10,
-      borderRadius: 8,
-      elevation: 2,
-      backgroundColor: isDarkMode ? '#1F1F1F' : '#FFFFFF',
+      borderRadius: 28,
+      backgroundColor: isDarkMode ? theme.colors.elevation.level2 : theme.colors.elevation.level1,
+    },
+    searchInput: {
+      color: isDarkMode ? theme.colors.onSurface : theme.colors.onSurface,
     },
     listContainer: {
-      paddingHorizontal: 10,
-      paddingBottom: 100,
+      padding: 16,
+      paddingBottom: 200,
     },
-    card: {
-      marginVertical: 8,
-      borderRadius: 8,
-      elevation: 2,
-      backgroundColor: isDarkMode ? '#1F1F1F' : '#FFFFFF',
-      borderWidth: 2,
-      borderColor: 'transparent',
+    drugCardContainer: {
+      borderRadius: 16,
+      overflow: 'hidden',
     },
-    title: {
-      color: isDarkMode ? '#FFFFFF' : '#000000',
-      fontWeight: 'bold',
-      textTransform: 'capitalize',
+    drugCard: {
+      backgroundColor: isDarkMode ? theme.colors.elevation.level2 : theme.colors.surface,
+      elevation: 0,
     },
-    interactionSurface: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      elevation: 8,
-      backgroundColor: isDarkMode ? '#1F1F1F' : '#FFFFFF',
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
+    selectedCard: {
+      backgroundColor: isDarkMode 
+        ? theme.colors.primaryContainer 
+        : theme.colors.primaryContainer,
     },
-    interactionContainer: {
+    drugCardContent: {
       flexDirection: 'row',
       alignItems: 'center',
       padding: 16,
+      justifyContent: 'space-between',
     },
-    interactionTextContainer: {
+    drugTextContainer: {
       flex: 1,
+    },
+    drugTitle: {
+      color: isDarkMode ? theme.colors.onSurface : theme.colors.onSurface,
+      fontWeight: '500',
+    },
+    selectedIconContainer: {
       marginLeft: 16,
     },
-    interactionTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: isDarkMode ? '#FFFFFF' : '#000000',
+    interactionCard: {
+      position: 'absolute',
+      bottom: 16,
+      left: 16,
+      right: 16,
+      borderRadius: 16,
+      backgroundColor: isDarkMode ? theme.colors.elevation.level2 : '#FFFFFF',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+      elevation: 8,
+    },
+    interactionCardContent: {
+      padding: 16,
+    },
+    interactionHeader: {
+      gap: 12,
+      alignItems: 'center',
+    },
+    drugPillsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    drugPill: {
+      backgroundColor: isDarkMode ? theme.colors.surfaceVariant : theme.colors.surfaceVariant,
+      height: 32,
+    },
+    statusContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      flexWrap: 'nowrap',
+      minWidth: 0,
+      paddingHorizontal: 12,
     },
     interactionStatus: {
-      fontSize: 16,
-      marginTop: 4,
+      fontWeight: '600',
+      flex: 1,
+      flexShrink: 1,
+      fontSize: Math.min(18, SCREEN_WIDTH * 0.045),
+      textAlign: 'center',
+      marginHorizontal: 8,
+      lineHeight: 28,
+    },
+    snackbar: {
+      marginBottom: 16,
     },
     modalContainer: {
       flex: 1,
+      margin: 0,
     },
     modalHeader: {
-      backgroundColor: isDarkMode ? '#1F1F1F' : '#6200EE',
+      elevation: 0,
+      backgroundColor: isDarkMode ? theme.colors.elevation.level2 : theme.colors.surface,
     },
     modalContent: {
+      flexGrow: 1,
       padding: 16,
     },
-    statusContainer: {
+    modalCard: {
+      borderRadius: 16,
+      backgroundColor: isDarkMode ? theme.colors.elevation.level2 : theme.colors.surface,
+      overflow: 'hidden',
+    },
+    modalStatusSection: {
       alignItems: 'center',
-      marginBottom: 16,
+      padding: 24,
+      backgroundColor: isDarkMode ? theme.colors.elevation.level1 : theme.colors.surfaceVariant,
+    },
+    modalDivider: {
+      backgroundColor: isDarkMode ? theme.colors.surfaceVariant : theme.colors.outlineVariant,
+    },
+    modalDetailsSection: {
+      padding: 24,
+    },
+    modalSectionTitle: {
+      color: theme.colors.onSurface,
+      marginBottom: 8,
+      fontWeight: '600',
     },
     modalStatusText: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      marginTop: 8,
+      marginTop: 16,
+      fontWeight: '700',
+      textAlign: 'center',
     },
     modalNoteText: {
       fontSize: 16,
-      marginBottom: 16,
-      color: isDarkMode ? '#DDDDDD' : '#424242',
+      lineHeight: 24,
+      color: theme.colors.onSurfaceVariant,
     },
     modalDefinitionText: {
       fontSize: 16,
-      color: isDarkMode ? '#DDDDDD' : '#424242',
-      fontStyle: 'italic',
+      lineHeight: 24,
+      color: theme.colors.onSurfaceVariant,
     },
-    clearButton: {
-      marginTop: 24,
+    modalActionsSection: {
+      padding: 24,
+      paddingTop: 0,
+    },
+    modalButton: {
+      borderRadius: 28,
+    },
+    drugDetailModal: {
+      flex: 1,
+      margin: 0,
+      backgroundColor: isDarkMode ? theme.colors.elevation.level2 : theme.colors.surface,
     },
     loadingContainer: {
       flex: 1,
@@ -630,10 +917,6 @@ const styles = (isDarkMode: boolean) =>
     loadingText: {
       marginTop: 10,
       color: isDarkMode ? '#FFFFFF' : '#000000',
-    },
-    drugDetailModal: {
-      flex: 1,
-      margin: 0,
     },
   });
 

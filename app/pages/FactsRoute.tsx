@@ -207,6 +207,7 @@ const FactsRoute: React.FC = () => {
   const filterModalY = useSharedValue(windowHeight);
   const headerOpacity = useSharedValue(1);
   const listScale = useSharedValue(1);
+  const overlayOpacity = useSharedValue(0);
 
   const searchBarAnimatedStyle = useAnimatedStyle(() => ({
     opacity: interpolate(searchBarHeight.value, [0, 56], [0, 1], Extrapolate.CLAMP),
@@ -221,6 +222,11 @@ const FactsRoute: React.FC = () => {
 
   const filterModalAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: filterModalY.value }],
+  }));
+
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+    pointerEvents: overlayOpacity.value > 0 ? 'auto' : 'none',
   }));
 
   const toggleSearchBar = () => {
@@ -245,14 +251,19 @@ const FactsRoute: React.FC = () => {
         stiffness: 90,
       });
       listScale.value = withTiming(0.95, { duration: 200 });
+      overlayOpacity.value = withTiming(0.5, { duration: 200 });
+      setIsFilterModalVisible(true);
     } else {
       filterModalY.value = withSpring(windowHeight, {
         damping: 20,
         stiffness: 90,
       });
       listScale.value = withTiming(1, { duration: 200 });
+      overlayOpacity.value = withTiming(0, { duration: 200 });
+      setTimeout(() => {
+        setIsFilterModalVisible(false);
+      }, 300);
     }
-    setIsFilterModalVisible(!isFilterModalVisible);
   };
 
   useEffect(() => {
@@ -397,29 +408,26 @@ const FactsRoute: React.FC = () => {
 
   const getIconForCategory = (category: string): keyof typeof MaterialCommunityIcons.glyphMap => {
     const iconMap: { [key: string]: keyof typeof MaterialCommunityIcons.glyphMap } = {
-      depressant: 'sleep',
-      psychedelic: 'brain',
-      stimulant: 'flash',
-      opioid: 'needle',
-      cannabinoid: 'leaf',
-      dissociative: 'cloud',
+      barbiturate: 'pill',
+      benzodiazepine: 'power-sleep',
+      common: 'star',
       deliriant: 'ghost',
-      nootropic: 'school',
-      'research chemical': 'flask',
-      antidepressant: 'emoticon-happy',
-      antipsychotic: 'emoticon-neutral',
-      benzodiazepine: 'sleep',
-      ssri: 'emoticon-neutral',
-      maoi: 'food-apple',
-      vitamin: 'pill',
-      entactogen: 'heart',
-      alcohol: 'glass-wine',
-      gabaergic: 'sleep',
-      steroid: 'dumbbell',
-      unclassified: 'help-circle',
-      'habit-forming': 'alert',
+      depressant: 'arrow-down-bold',
+      dissociative: 'cloud',
+      empathogen: 'heart',
+      'habit-forming': 'alert-circle',
+      inactive: 'cancel',
+      nootropic: 'brain',
+      opioid: 'needle',
+      psychedelic: 'mushroom',
+      'research-chemical': 'flask',
+      ssri: 'molecule',
+      stimulant: 'lightning-bolt',
+      supplement: 'leaf',
+      tentative: 'help-circle',
+      uncategorized: 'help-circle-outline'
     };
-    return iconMap[category] || 'pill';
+    return iconMap[category.toLowerCase()] || 'pill';
   };
 
   const categoryColors: { [key: string]: string } = {
@@ -610,9 +618,8 @@ const FactsRoute: React.FC = () => {
         <Animated.View 
           style={[
             styles(isDarkMode, theme).filterModalOverlay,
-            { opacity: interpolate(filterModalY.value, [windowHeight, windowHeight * 0.4], [0, 0.5]) }
+            overlayAnimatedStyle
           ]}
-          pointerEvents={isFilterModalVisible ? 'auto' : 'none'}
         >
           <TouchableOpacity 
             style={{ flex: 1 }} 
@@ -620,7 +627,13 @@ const FactsRoute: React.FC = () => {
             activeOpacity={1}
           />
         </Animated.View>
-        <AnimatedSurface style={[styles(isDarkMode, theme).filterModal, filterModalAnimatedStyle]}>
+        <AnimatedSurface 
+          style={[
+            styles(isDarkMode, theme).filterModal, 
+            filterModalAnimatedStyle,
+            { pointerEvents: isFilterModalVisible ? 'auto' : 'none' }
+          ]}
+        >
           <View style={styles(isDarkMode, theme).filterModalHandle} />
           <View style={styles(isDarkMode, theme).filterModalContent}>
             <View style={styles(isDarkMode, theme).filterModalHeader}>
@@ -656,7 +669,7 @@ const FactsRoute: React.FC = () => {
                           backgroundColor: theme.colors.primaryContainer,
                         },
                       ]}
-                      avatar={
+                      icon={() => (
                         <MaterialCommunityIcons
                           name={getIconForCategory(category)}
                           size={18}
@@ -664,7 +677,7 @@ const FactsRoute: React.FC = () => {
                             ? theme.colors.onPrimaryContainer
                             : theme.colors.onSurfaceVariant}
                         />
-                      }
+                      )}
                       textStyle={{
                         color: selectedCategories.includes(category)
                           ? theme.colors.onPrimaryContainer
@@ -684,7 +697,7 @@ const FactsRoute: React.FC = () => {
               entering={SlideInRight.delay(200)}
             >
               <Button
-                mode="outlined"
+                mode="text"
                 onPress={() => {
                   setSelectedCategories([]);
                   applyFilters(searchQuery, []);
@@ -850,6 +863,9 @@ const styles = (isDarkMode: boolean, theme: any) =>
       marginBottom: 8,
       backgroundColor: isDarkMode ? theme.colors.elevation.level3 : theme.colors.surfaceVariant,
       height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
     },
     filterActions: {
       flexDirection: 'row',
@@ -862,10 +878,12 @@ const styles = (isDarkMode: boolean, theme: any) =>
     clearButton: {
       flex: 1,
       borderRadius: 20,
+      minWidth: 120,
     },
     applyButton: {
       flex: 1,
       borderRadius: 20,
+      minWidth: 120,
     },
     modalContent: {
       flex: 1,

@@ -8,6 +8,8 @@ import {
   ScrollView,
   TouchableOpacity,
   useColorScheme,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
 import {
   Chip,
@@ -98,6 +100,59 @@ type DrugDetailScreenProps = {
   drug: Drug;
   onClose: () => void;
 };
+
+interface Styles {
+  container: ViewStyle;
+  header: ViewStyle;
+  content: ViewStyle;
+  card: ViewStyle;
+  section: ViewStyle;
+  sectionTitle: TextStyle;
+  summary: TextStyle;
+  divider: ViewStyle;
+  chipContainer: ViewStyle;
+  chip: ViewStyle;
+  chipText: TextStyle;
+  timelineCard: ViewStyle;
+  timeline: ViewStyle;
+  timelinePhase: ViewStyle;
+  timelineBar: ViewStyle;
+  progressBar: ViewStyle;
+  timelineLabel: TextStyle;
+  timelineInfo: ViewStyle;
+  infoItem: ViewStyle;
+  infoText: TextStyle;
+  effectsCard: ViewStyle;
+  effectsGrid: ViewStyle;
+  effectItem: ViewStyle;
+  effectText: TextStyle;
+  doseCard: ViewStyle;
+  doseSection: ViewStyle;
+  doseRoute: TextStyle;
+  doseGrid: ViewStyle;
+  doseItem: ViewStyle;
+  doseClassification: TextStyle;
+  doseAmount: TextStyle;
+  doseNote: ViewStyle;
+  doseNoteText: TextStyle;
+  combosCard: ViewStyle;
+  combosGrid: ViewStyle;
+  comboItem: ViewStyle;
+  comboHeader: ViewStyle;
+  comboDrug: TextStyle;
+  comboStatus: ViewStyle;
+  comboNote: TextStyle;
+  linksCard: ViewStyle;
+  linkItem: ViewStyle;
+  linkText: TextStyle;
+  loadingContainer: ViewStyle;
+  loadingText: TextStyle;
+  chartCard: ViewStyle;
+  chartTitle: TextStyle;
+  chart: ViewStyle;
+  segmentedButtons: ViewStyle;
+  segmentButton: ViewStyle;
+}
 
 const AnimatedSurface = Animated.createAnimatedComponent(Surface);
 const AnimatedCard = Animated.createAnimatedComponent(Card);
@@ -618,35 +673,10 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
 
   return (
     <View style={styles(theme).container}>
-      <Animated.View style={[styles(theme).header, headerAnimationStyle]}>
-        <Appbar.Header 
-          style={[styles(theme).appBar]} 
-          mode="center-aligned"
-          theme={{
-            colors: {
-              surface: theme.colors.elevation.level2,
-            },
-          }}
-        >
-          <Appbar.BackAction 
-            onPress={onClose}
-            iconColor={theme.colors.onSurface}
-          />
-          <Appbar.Content
-            title={drugDetails.pretty_name || drug.name}
-            titleStyle={{ color: theme.colors.onSurface }}
-            subtitle={lastUpdated ? `Last updated ${lastUpdated}` : undefined}
-            subtitleStyle={{ 
-              color: `${theme.colors.onSurface}80`
-            }}
-          />
-          <Appbar.Action 
-            icon="share" 
-            onPress={() => {}}
-            iconColor={theme.colors.onSurface}
-          />
-        </Appbar.Header>
-      </Animated.View>
+      <Appbar.Header style={styles(theme).header} elevated>
+        <Appbar.BackAction onPress={onClose} />
+        <Appbar.Content title={drugDetails.pretty_name || drug.name} subtitle={lastUpdated ? `Last updated ${lastUpdated}` : undefined} />
+      </Appbar.Header>
 
       <SegmentedButtons
         value={selectedTab}
@@ -683,35 +713,71 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >
-        <Card style={styles(theme).summaryCard} mode="elevated">
-          <Card.Content>
-            <View style={styles(theme).categoryContainer}>
-              {drug.categories.map((category, index) => (
-                <Chip
-                  key={index}
-                  style={[
-                    styles(theme).categoryChip,
-                    { backgroundColor: getCategoryColor(category) },
-                  ]}
-                  textStyle={styles(theme).categoryChipText}
-                >
-                  {category}
-                </Chip>
-              ))}
+        <Surface style={styles(theme).card} elevation={0}>
+          {drugDetails.properties?.summary && (
+            <View style={styles(theme).section}>
+              <Text variant="titleMedium" style={styles(theme).sectionTitle}>
+                Summary
+              </Text>
+              <Text variant="bodyLarge" style={styles(theme).summary}>
+                {drugDetails.properties.summary}
+              </Text>
             </View>
-            <Paragraph style={styles(theme).summary}>
-              {drugDetails.properties?.summary}
-            </Paragraph>
-            {drug.aliases.length > 0 && (
-              <View style={styles(theme).aliasesContainer}>
-                <Text style={styles(theme).aliasesLabel}>Also known as:</Text>
-                <Text style={styles(theme).aliases}>
-                  {drug.aliases.join(', ')}
+          )}
+
+          {drug.aliases && drug.aliases.length > 0 && (
+            <>
+              <Divider style={styles(theme).divider} />
+              <View style={styles(theme).section}>
+                <Text variant="titleMedium" style={styles(theme).sectionTitle}>
+                  Also Known As
                 </Text>
+                <View style={styles(theme).chipContainer}>
+                  {drug.aliases.map((alias, index) => (
+                    <Chip
+                      key={index}
+                      style={styles(theme).chip}
+                      textStyle={styles(theme).chipText}
+                      mode="flat"
+                    >
+                      {alias}
+                    </Chip>
+                  ))}
+                </View>
               </View>
-            )}
-          </Card.Content>
-        </Card>
+            </>
+          )}
+
+          {drug.categories && drug.categories.length > 0 && (
+            <>
+              <Divider style={styles(theme).divider} />
+              <View style={styles(theme).section}>
+                <Text variant="titleMedium" style={styles(theme).sectionTitle}>
+                  Categories
+                </Text>
+                <View style={styles(theme).chipContainer}>
+                  {drug.categories.map((category, index) => (
+                    <Chip
+                      key={index}
+                      style={styles(theme).chip}
+                      textStyle={styles(theme).chipText}
+                      mode="flat"
+                      icon={() => (
+                        <MaterialCommunityIcons
+                          name="pill"
+                          size={16}
+                          color={theme.colors.onSurfaceVariant}
+                        />
+                      )}
+                    >
+                      {category}
+                    </Chip>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
+        </Surface>
 
         {renderContent()}
 
@@ -747,18 +813,13 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
 };
 
 const styles = (theme: any) =>
-  StyleSheet.create({
+  StyleSheet.create<Styles>({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
     header: {
-      zIndex: 1,
-      backgroundColor: theme.colors.elevation.level2,
-    },
-    appBar: {
       elevation: 0,
-      backgroundColor: theme.colors.elevation.level2,
     },
     segmentedButtons: {
       margin: 16,
@@ -768,54 +829,37 @@ const styles = (theme: any) =>
       borderRadius: 28,
     },
     content: {
-      flex: 1,
+      padding: 16,
+      flexGrow: 1,
     },
-    sectionHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 16,
-      gap: 12,
+    card: {
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    section: {
+      padding: 24,
     },
     sectionTitle: {
-      color: theme.colors.onSurface,
-      fontSize: 20,
+      marginBottom: 16,
       fontWeight: '600',
     },
-    summaryCard: {
-      margin: 16,
-      marginTop: 0,
-      borderRadius: 16,
+    summary: {
+      lineHeight: 24,
     },
-    categoryContainer: {
+    divider: {
+      height: 1,
+    },
+    chipContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
-      marginBottom: 16,
     },
-    categoryChip: {
-      borderRadius: 16,
-    },
-    categoryChipText: {
-      color: '#FFFFFF',
-    },
-    summary: {
-      fontSize: 16,
-      lineHeight: 24,
-      color: theme.colors.onSurfaceVariant,
-    },
-    aliasesContainer: {
-      marginTop: 16,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
-    aliasesLabel: {
-      fontWeight: 'bold',
+    chip: {
       marginRight: 8,
-      color: theme.colors.onSurface,
+      marginBottom: 8,
     },
-    aliases: {
-      flex: 1,
-      color: theme.colors.onSurfaceVariant,
+    chipText: {
+      fontSize: 14,
     },
     timelineCard: {
       margin: 16,
