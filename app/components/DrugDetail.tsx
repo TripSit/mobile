@@ -118,6 +118,7 @@ interface Styles {
   timelinePhase: ViewStyle;
   timelineBar: ViewStyle;
   progressBar: ViewStyle;
+  progressBarFill: ViewStyle;
   timelineLabel: TextStyle;
   timelineInfo: ViewStyle;
   infoItem: ViewStyle;
@@ -140,7 +141,7 @@ interface Styles {
   comboItem: ViewStyle;
   comboHeader: ViewStyle;
   comboDrug: TextStyle;
-  comboStatus: ViewStyle;
+  comboStatus: TextStyle;
   comboNote: TextStyle;
   linksCard: ViewStyle;
   linkItem: ViewStyle;
@@ -150,8 +151,29 @@ interface Styles {
   chartCard: ViewStyle;
   chartTitle: TextStyle;
   chart: ViewStyle;
-  segmentedButtons: ViewStyle;
-  segmentButton: ViewStyle;
+  sectionHeader: ViewStyle;
+  tabBar: ViewStyle;
+  tabButton: ViewStyle;
+  tabButtonSelected: ViewStyle;
+  tabButtonText: TextStyle;
+  tabButtonIcon: ViewStyle;
+  timelineProgress: ViewStyle;
+  timelineRow: ViewStyle;
+  timelineTime: TextStyle;
+  timelinePhaseLabel: TextStyle;
+  timelineMetrics: ViewStyle;
+  timelineMetric: ViewStyle;
+  timelineMetricIcon: ViewStyle;
+  timelineMetricText: TextStyle;
+  timelineMetricValue: TextStyle;
+  phaseMarkers: ViewStyle;
+  phaseMarker: ViewStyle;
+  phaseMarkerLine: ViewStyle;
+  phaseMarkerLabel: TextStyle;
+  timeMarkers: ViewStyle;
+  nowMarker: TextStyle;
+  nowIndicator: ViewStyle;
+  nowLabel: TextStyle;
 }
 
 const AnimatedSurface = Animated.createAnimatedComponent(Surface);
@@ -163,6 +185,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
   const isDarkMode = useColorScheme() === 'dark';
   const [selectedTab, setSelectedTab] = useState('overview');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [currentTime] = useState(new Date());
   const windowWidth = Dimensions.get('window').width;
   
   const headerOpacity = useSharedValue(0);
@@ -245,173 +268,309 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
     return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
   }, [onClose, headerOpacity, contentOpacity, slideIn]);
 
-  const parseDuration = (duration: string | undefined): number => {
-    if (!duration) return 0;
-
-    const ranges = duration.split('-').map(s => s.trim());
-    const totalMinutes = ranges
-      .map(range => {
-        const units = range.match(/[a-zA-Z]+/g);
-        const values = range.match(/[\d.]+/g);
-
-        if (!units || !values) return 0;
-
-        let minutes = 0;
-
-        for (let i = 0; i < units.length; i++) {
-          const value = parseFloat(values[i]);
-          const unit = units[i].toLowerCase();
-
-          if (unit.includes('hour')) {
-            minutes += value * 60;
-          } else if (unit.includes('minute')) {
-            minutes += value;
-          }
-        }
-
-        return minutes;
-      })
-      .reduce((a, b) => a + b, 0);
-
-    return totalMinutes / ranges.length;
+  const parseDuration = (durationStr: string | undefined): { min: number; max: number; avg: number; unit: string } => {
+    if (!durationStr) return { min: 0, max: 0, avg: 0, unit: 'minutes' };
+    
+    // Extract numbers from strings like "45-90 minutes" or "8-12 hours"
+    const numbers = durationStr.match(/\d+/g);
+    if (!numbers) return { min: 0, max: 0, avg: 0, unit: 'minutes' };
+    
+    let min = parseInt(numbers[0]);
+    let max = numbers.length > 1 ? parseInt(numbers[1]) : min;
+    
+    // Determine the unit (minutes or hours)
+    const unit = durationStr.toLowerCase().includes('hour') ? 'hours' : 'minutes';
+    
+    const avg = (min + max) / 2;
+    return { min, max, avg, unit };
   };
-
-  const generateChartData = () => {
-    if (!drugDetails) return null;
-
-    const onset = drugDetails.formatted_onset?.value;
-    const duration = drugDetails.formatted_duration?.value;
-    const aftereffects = drugDetails.formatted_aftereffects?.value;
-
-    const onsetMinutes = parseDuration(onset);
-    const durationMinutes = parseDuration(duration);
-    const aftereffectsMinutes = parseDuration(aftereffects);
-
-    const totalDuration = onsetMinutes + durationMinutes + aftereffectsMinutes;
-
-    if (totalDuration === 0) return null;
-
-    const dataPoints = [
-      { time: 0, intensity: 0 },
-      { time: onsetMinutes, intensity: 0 },
-      { time: onsetMinutes + 0.1, intensity: 50 },
-      { time: onsetMinutes + durationMinutes / 2, intensity: 100 },
-      { time: onsetMinutes + durationMinutes, intensity: 50 },
-      { time: totalDuration, intensity: 0 },
-    ];
-
-    const intensities = dataPoints.map(d => d.intensity);
-
-    const labelInterval = totalDuration / 4;
-    const labels = [];
-    for (let i = 0; i <= 4; i++) {
-      const time = i * labelInterval;
-      const hours = Math.floor(time / 60);
-      const minutes = Math.round(time % 60);
-      labels.push(hours > 0 ? `${hours}h` : `${minutes}m`);
-    }
-
-    return {
-      labels,
-      datasets: [
-        {
-          data: intensities,
-          color: (opacity = 1) => 
-            theme.colors.primary + (opacity !== 1 ? Math.round(opacity * 255).toString(16) : ''),
-          strokeWidth: 2,
-        },
-      ],
-    };
+  
+  // Helper function to check the original unit from source data
+  const getOriginalUnit = (value: string | undefined): string => {
+    if (!value) return 'minutes';
+    return value.toLowerCase().includes('hour') ? 'hours' : 'minutes';
   };
 
   const generateTimelineData = () => {
     if (!drugDetails) return null;
 
-    const onset = drugDetails.formatted_onset?.value;
-    const duration = drugDetails.formatted_duration?.value;
-    const aftereffects = drugDetails.formatted_aftereffects?.value;
+    // Check if we have all required duration data
+    if (!drugDetails.formatted_onset?.value || !drugDetails.formatted_duration?.value || !drugDetails.formatted_aftereffects?.value) {
+      return null;
+    }
 
-    const onsetMinutes = parseDuration(onset);
-    const durationMinutes = parseDuration(duration);
-    const aftereffectsMinutes = parseDuration(aftereffects);
+    // Get the duration data with proper units directly from the source
+    const onset = {
+      min: parseInt(drugDetails.formatted_onset.value.match(/\d+/g)?.[0] || "0"),
+      max: parseInt(drugDetails.formatted_onset.value.match(/\d+/g)?.[1] || drugDetails.formatted_onset.value.match(/\d+/g)?.[0] || "0"),
+      unit: drugDetails.formatted_onset._unit || "minutes"
+    };
 
-    return [
-      {
-        phase: 'Onset',
-        duration: onsetMinutes,
-        color: theme.colors.primary,
-        intensity: 30,
-      },
-      {
-        phase: 'Peak',
-        duration: durationMinutes,
-        color: theme.colors.secondary,
-        intensity: 100,
-      },
-      {
-        phase: 'After Effects',
-        duration: aftereffectsMinutes,
-        color: theme.colors.tertiary,
-        intensity: 50,
-      },
-    ];
+    const duration = {
+      min: parseInt(drugDetails.formatted_duration.value.match(/\d+/g)?.[0] || "0"),
+      max: parseInt(drugDetails.formatted_duration.value.match(/\d+/g)?.[1] || drugDetails.formatted_duration.value.match(/\d+/g)?.[0] || "0"),
+      unit: drugDetails.formatted_duration._unit || "hours"
+    };
+
+    const aftereffects = {
+      min: parseInt(drugDetails.formatted_aftereffects.value.match(/\d+/g)?.[0] || "0"),
+      max: parseInt(drugDetails.formatted_aftereffects.value.match(/\d+/g)?.[1] || drugDetails.formatted_aftereffects.value.match(/\d+/g)?.[0] || "0"),
+      unit: drugDetails.formatted_aftereffects._unit || "hours"
+    };
+
+    // Convert all durations to minutes for internal calculations
+    const onsetMinutes = onset.unit === 'hours' ? onset.min * 60 : onset.min;
+    const durationMinutes = duration.unit === 'hours' ? duration.min * 60 : duration.min;
+    const aftereffectsMinutes = aftereffects.unit === 'hours' ? aftereffects.min * 60 : aftereffects.min;
+
+    // Calculate real end times for each phase
+    const onsetEnd = onsetMinutes;
+    const peakEnd = onsetEnd + durationMinutes;
+    const afterEffectsEnd = peakEnd + aftereffectsMinutes;
+
+    // Create timeline data
+    return {
+      phases: [
+        {
+          name: 'Onset',
+          duration: `${onset.min}${onset.max > onset.min ? `-${onset.max}` : ''} ${onset.unit}`,
+          color: theme.colors.primary,
+          endTime: formatDuration(onsetEnd),
+          unit: onset.unit
+        },
+        {
+          name: 'Peak',
+          duration: `${duration.min}${duration.max > duration.min ? `-${duration.max}` : ''} ${duration.unit}`,
+          color: theme.colors.primary,
+          endTime: formatDuration(peakEnd),
+          unit: duration.unit
+        },
+        {
+          name: 'After Effects',
+          duration: `${aftereffects.min}${aftereffects.max > aftereffects.min ? `-${aftereffects.max}` : ''} ${aftereffects.unit}`,
+          color: theme.colors.primary,
+          endTime: formatDuration(afterEffectsEnd),
+          unit: aftereffects.unit
+        }
+      ],
+      metrics: {
+        onset: {
+          value: `${onset.min}${onset.max > onset.min ? `-${onset.max}` : ''} ${onset.unit}`,
+          icon: 'timer-outline'
+        },
+        duration: {
+          value: `${duration.min}${duration.max > duration.min ? `-${duration.max}` : ''} ${duration.unit}`,
+          icon: 'clock-outline'
+        },
+        aftereffects: {
+          value: `${aftereffects.min}${aftereffects.max > aftereffects.min ? `-${aftereffects.max}` : ''} ${aftereffects.unit}`,
+          icon: 'clock-time-eight-outline'
+        }
+      }
+    };
+  };
+
+  const generateChartData = () => {
+    if (!drugDetails) return null;
+
+    // Check if we have all required duration data
+    // Return null if any required data is missing
+    if (!drugDetails.formatted_onset?.value || !drugDetails.formatted_duration?.value) {
+      return null;
+    }
+
+    try {
+      // Parse the onset value
+      const onsetMatch = drugDetails.formatted_onset.value.match(/\d+/g);
+      if (!onsetMatch || onsetMatch.length === 0) return null;
+
+      // Parse the duration value
+      const durationMatch = drugDetails.formatted_duration.value.match(/\d+/g);
+      if (!durationMatch || durationMatch.length === 0) return null;
+
+      // Get the duration data with proper units directly from the source
+      const onset = {
+        min: parseInt(onsetMatch[0] || "0"),
+        max: parseInt(onsetMatch[1] || onsetMatch[0] || "0"),
+        unit: drugDetails.formatted_onset._unit || "minutes",
+        avg: (parseInt(onsetMatch[0] || "0") + 
+              parseInt(onsetMatch[1] || onsetMatch[0] || "0")) / 2
+      };
+
+      const duration = {
+        min: parseInt(durationMatch[0] || "0"),
+        max: parseInt(durationMatch[1] || durationMatch[0] || "0"),
+        unit: drugDetails.formatted_duration._unit || "hours",
+        avg: (parseInt(durationMatch[0] || "0") + 
+              parseInt(durationMatch[1] || durationMatch[0] || "0")) / 2
+      };
+
+      // If either onset or duration is zero, don't show the chart
+      if (onset.avg === 0 || duration.avg === 0) return null;
+
+      // Convert all durations to minutes for the chart
+      const onsetMinutes = onset.unit === 'hours' ? onset.avg * 60 : onset.avg;
+      const durationMinutes = duration.unit === 'hours' ? duration.avg * 60 : duration.avg;
+
+      // Calculate total duration in hours (only onset + peak)
+      const totalDuration = onsetMinutes + durationMinutes;
+      const totalHours = Math.ceil(totalDuration / 60);
+
+      if (totalHours === 0) return null;
+
+      // Create data points for a smooth curve showing intensity over time
+      const dataPoints = [];
+      const now = currentTime;
+      
+      // Create a smooth curve with appropriate resolution
+      const timeSteps = 24; // Fixed number of steps for smooth curve
+      const minutesPerStep = totalDuration / timeSteps;
+      
+      for (let step = 0; step <= timeSteps; step++) {
+        const minutesFromStart = step * minutesPerStep;
+        let intensity = 0;
+        
+        // Calculate intensity based on which phase we're in
+        if (minutesFromStart <= onsetMinutes) {
+          // During onset: rapid rise to 100% (exponential)
+          intensity = 100 * Math.pow(minutesFromStart / onsetMinutes, 1.5);
+          intensity = Math.min(intensity, 100); // Cap at 100%
+        } else if (minutesFromStart <= (onsetMinutes + durationMinutes)) {
+          // During peak: gradual decline
+          const timeIntoPeak = minutesFromStart - onsetMinutes;
+          const decayRate = -2 * (timeIntoPeak / durationMinutes);
+          intensity = 100 * Math.exp(decayRate);
+        }
+        
+        // Add time and intensity to data points
+        const pointTime = new Date(now.getTime() + minutesFromStart * 60000);
+        dataPoints.push({
+          time: format(pointTime, 'HH:mm'),
+          intensity: Math.round(intensity)
+        });
+      }
+
+      // Calculate hour labels with appropriate spacing
+      // Limit to 6 labels maximum to prevent overlapping
+      const maxLabels = 6;
+      const labelInterval = Math.max(1, Math.ceil(totalHours / (maxLabels - 1)));
+      
+      const hourLabels = [];
+      for (let h = 0; h <= totalHours; h += labelInterval) {
+        if (hourLabels.length < maxLabels) {
+          const pointTime = new Date(now.getTime() + h * 60 * 60000);
+          hourLabels.push(format(pointTime, 'HH:mm'));
+        }
+      }
+
+      // Ensure we return a valid LineChartData object
+      return {
+        labels: hourLabels,
+        datasets: [
+          {
+            data: dataPoints.map(p => p.intensity),
+            color: (opacity = 1) => theme.colors.primary + (opacity !== 1 ? Math.round(opacity * 255).toString(16) : ''),
+            strokeWidth: 3,
+          },
+        ]
+      };
+    } catch (error) {
+      console.log('Error generating chart data:', error);
+      return null;
+    }
+  };
+
+  const renderTabButton = (value: string, label: string, iconName: string) => {
+    const isSelected = selectedTab === value;
+    return (
+      <TouchableOpacity 
+        onPress={() => setSelectedTab(value)}
+        style={[
+          styles(theme).tabButton,
+          isSelected && styles(theme).tabButtonSelected
+        ]}
+      >
+        <View style={styles(theme).tabButtonIcon}>
+          <MaterialCommunityIcons 
+            name={iconName as any} 
+            size={24} 
+            color={isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant} 
+          />
+        </View>
+        <Text style={[
+          styles(theme).tabButtonText,
+          { color: isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant }
+        ]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   const renderTimeline = () => {
     const timelineData = generateTimelineData();
     if (!timelineData) return null;
 
-    const totalDuration = timelineData.reduce((sum, phase) => sum + phase.duration, 0);
-
     return (
       <Card style={styles(theme).timelineCard} mode="elevated">
         <Card.Content>
           <View style={styles(theme).sectionHeader}>
-            <MaterialCommunityIcons name="clock-outline" size={24} color={theme.colors.primary} />
+            <MaterialCommunityIcons 
+              name="clock-outline" 
+              size={24} 
+              color={theme.colors.primary}
+              style={{ opacity: 0.8 }}
+            />
             <Title style={styles(theme).sectionTitle}>Duration Profile</Title>
           </View>
-          <View style={styles(theme).timeline}>
-            {timelineData.map((phase, index) => (
-              <View
-                key={phase.phase}
-                style={[
-                  styles(theme).timelinePhase,
-                  { flex: phase.duration / totalDuration },
-                ]}
-              >
-                <View style={styles(theme).timelineBar}>
-                  <ProgressBar
-                    progress={phase.intensity / 100}
-                    color={phase.color}
-                    style={styles(theme).progressBar}
-                  />
-                </View>
-                <Text style={styles(theme).timelineLabel}>
-                  {phase.phase}
-                  {'\n'}
-                  {formatDuration(phase.duration)}
+
+          <View style={styles(theme).timelineMetrics}>
+            <View style={styles(theme).timelineMetric}>
+              <View style={styles(theme).timelineMetricIcon}>
+                <MaterialCommunityIcons 
+                  name="timer-outline" 
+                  size={20} 
+                  color={theme.colors.onSurfaceVariant} 
+                />
+              </View>
+              <View>
+                <Text style={styles(theme).timelineMetricText}>Onset</Text>
+                <Text style={styles(theme).timelineMetricValue}>
+                  {timelineData.phases[0].duration}
                 </Text>
               </View>
-            ))}
-          </View>
-          <View style={styles(theme).timelineInfo}>
-            <View style={styles(theme).infoItem}>
-              <MaterialCommunityIcons name="timer-outline" size={20} color={theme.colors.onSurfaceVariant} />
-              <Text style={styles(theme).infoText}>
-                Onset: {drugDetails.formatted_onset?.value}
-              </Text>
             </View>
-            <View style={styles(theme).infoItem}>
-              <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.onSurfaceVariant} />
-              <Text style={styles(theme).infoText}>
-                Duration: {drugDetails.formatted_duration?.value}
-              </Text>
+
+            <View style={styles(theme).timelineMetric}>
+              <View style={styles(theme).timelineMetricIcon}>
+                <MaterialCommunityIcons 
+                  name="clock-outline" 
+                  size={20} 
+                  color={theme.colors.onSurfaceVariant} 
+                />
+              </View>
+              <View>
+                <Text style={styles(theme).timelineMetricText}>Duration</Text>
+                <Text style={styles(theme).timelineMetricValue}>
+                  {timelineData.phases[1].duration}
+                </Text>
+              </View>
             </View>
-            <View style={styles(theme).infoItem}>
-              <MaterialCommunityIcons name="clock-check-outline" size={20} color={theme.colors.onSurfaceVariant} />
-              <Text style={styles(theme).infoText}>
-                After Effects: {drugDetails.formatted_aftereffects?.value}
-              </Text>
+
+            <View style={styles(theme).timelineMetric}>
+              <View style={styles(theme).timelineMetricIcon}>
+                <MaterialCommunityIcons 
+                  name="clock-check-outline" 
+                  size={20} 
+                  color={theme.colors.onSurfaceVariant} 
+                />
+              </View>
+              <View>
+                <Text style={styles(theme).timelineMetricText}>After Effects</Text>
+                <Text style={styles(theme).timelineMetricValue}>
+                  {timelineData.phases[2].duration}
+                </Text>
+              </View>
             </View>
           </View>
         </Card.Content>
@@ -419,37 +578,67 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
     );
   };
 
-  const renderEffectsChart = () => {
+  const renderIntensityChart = () => {
     const chartData = generateChartData();
+    
     if (!chartData) return null;
-
+    
     return (
       <Card style={styles(theme).chartCard}>
         <Card.Content>
-          <Title style={styles(theme).chartTitle}>Intensity Over Time</Title>
-          <LineChart
-            data={chartData}
-            width={screenWidth - 48}
-            height={220}
-            chartConfig={{
-              backgroundColor: theme.colors.surface,
-              backgroundGradientFrom: theme.colors.surface,
-              backgroundGradientTo: theme.colors.surface,
-              decimalPlaces: 0,
-              color: (opacity = 1) => theme.colors.primary + Math.round(opacity * 255).toString(16),
-              labelColor: () => theme.colors.onSurface,
-              style: {
+          <View style={styles(theme).sectionHeader}>
+            <MaterialCommunityIcons 
+              name="chart-bell-curve" 
+              size={24} 
+              color={theme.colors.primary}
+              style={{ opacity: 0.8 }}
+            />
+            <Title style={styles(theme).sectionTitle}>Intensity Over Time</Title>
+          </View>
+          <View style={styles(theme).chart}>
+            <LineChart
+              data={chartData}
+              width={screenWidth - 80}
+              height={200}
+              chartConfig={{
+                backgroundColor: theme.colors.background,
+                backgroundGradientFrom: theme.colors.background,
+                backgroundGradientTo: theme.colors.background,
+                decimalPlaces: 0,
+                color: (opacity = 1) => theme.colors.primary + (opacity !== 1 ? Math.round(opacity * 255).toString(16) : ''),
+                labelColor: () => theme.colors.onBackground,
+                style: {
+                  borderRadius: 16,
+                },
+                propsForDots: {
+                  r: '0',
+                  strokeWidth: '0',
+                },
+                propsForBackgroundLines: {
+                  strokeDasharray: '',
+                  stroke: theme.colors.outline,
+                  strokeWidth: 0.5,
+                },
+                fillShadowGradient: theme.colors.primary,
+                fillShadowGradientOpacity: 0.3,
+              }}
+              bezier
+              style={{
+                marginVertical: 8,
                 borderRadius: 16,
-              },
-              propsForDots: {
-                r: '6',
-                strokeWidth: '2',
-                stroke: theme.colors.primary,
-              },
-            }}
-            bezier
-            style={styles(theme).chart}
-          />
+              }}
+              withInnerLines={false}
+              withOuterLines={false}
+              withHorizontalLabels={false}
+              withVerticalLabels={true}
+              withDots={false}
+              yAxisLabel=""
+              yAxisSuffix=""
+            />
+            <View style={{ position: 'absolute', bottom: 10, left: 10 }}>
+              <Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>Now</Text>
+            </View>
+          </View>
         </Card.Content>
       </Card>
     );
@@ -562,7 +751,7 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
         return (
           <>
             {renderTimeline()}
-            {renderEffectsChart()}
+            {renderIntensityChart()}
             {renderEffects()}
           </>
         );
@@ -678,34 +867,11 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
         <Appbar.Content title={drugDetails.pretty_name || drug.name} subtitle={lastUpdated ? `Last updated ${lastUpdated}` : undefined} />
       </Appbar.Header>
 
-      <SegmentedButtons
-        value={selectedTab}
-        onValueChange={setSelectedTab}
-        buttons={[
-          {
-            value: 'overview',
-            label: 'Overview',
-            icon: 'information',
-            style: styles(theme).segmentButton
-          },
-          {
-            value: 'dosage',
-            label: 'Dosage',
-            icon: 'scale',
-            style: styles(theme).segmentButton
-          },
-          {
-            value: 'interactions',
-            label: 'Interactions',
-            icon: 'molecule',
-            style: styles(theme).segmentButton
-          },
-        ]}
-        style={[
-          styles(theme).segmentedButtons,
-          { backgroundColor: theme.colors.elevation.level2 }
-        ]}
-      />
+      <View style={styles(theme).tabBar}>
+        {renderTabButton('overview', 'Overview', 'information')}
+        {renderTabButton('dosage', 'Dosage', 'scale')}
+        {renderTabButton('interactions', 'Interactions', 'molecule')}
+      </View>
 
       <AnimatedScrollView
         style={[styles(theme).content, contentAnimationStyle]}
@@ -812,8 +978,8 @@ const DrugDetailScreen: React.FC<DrugDetailScreenProps> = ({ drug, onClose }) =>
   );
 };
 
-const styles = (theme: any) =>
-  StyleSheet.create<Styles>({
+const styles = (theme: any): Styles =>
+  StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
@@ -821,12 +987,31 @@ const styles = (theme: any) =>
     header: {
       elevation: 0,
     },
-    segmentedButtons: {
-      margin: 16,
-      borderRadius: 28,
+    tabBar: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: theme.colors.surfaceVariant,
+      gap: 8,
     },
-    segmentButton: {
-      borderRadius: 28,
+    tabButton: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      backgroundColor: 'transparent',
+    },
+    tabButtonSelected: {
+      backgroundColor: theme.colors.primaryContainer,
+    },
+    tabButtonText: {
+      fontSize: 14,
+      fontWeight: '500',
+      marginTop: 4,
+    },
+    tabButtonIcon: {
+      position: 'relative',
     },
     content: {
       padding: 16,
@@ -864,33 +1049,46 @@ const styles = (theme: any) =>
     timelineCard: {
       margin: 16,
       borderRadius: 16,
+      overflow: 'hidden',
     },
     timeline: {
       flexDirection: 'row',
       height: 100,
       gap: 8,
+      marginTop: 8,
     },
     timelinePhase: {
       alignItems: 'center',
+      flex: 1,
     },
     timelineBar: {
       flex: 1,
-      width: '100%',
-      justifyContent: 'center',
+      height: '100%',
     },
     progressBar: {
       height: 8,
       borderRadius: 4,
+    },
+    progressBarFill: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
     },
     timelineLabel: {
       fontSize: 12,
       textAlign: 'center',
       marginTop: 8,
       color: theme.colors.onSurfaceVariant,
+      lineHeight: 16,
     },
     timelineInfo: {
       marginTop: 16,
       gap: 8,
+      backgroundColor: theme.colors.surfaceVariant,
+      padding: 12,
+      borderRadius: 12,
     },
     infoItem: {
       flexDirection: 'row',
@@ -994,6 +1192,8 @@ const styles = (theme: any) =>
     },
     comboStatus: {
       backgroundColor: 'rgba(255,255,255,0.2)',
+      color: theme.colors.surface,
+      fontSize: 12,
     },
     comboNote: {
       marginTop: 8,
@@ -1026,15 +1226,119 @@ const styles = (theme: any) =>
     chartCard: {
       margin: 16,
       borderRadius: 16,
-      backgroundColor: theme.colors.surface,
     },
     chartTitle: {
       marginBottom: 16,
       color: theme.colors.onSurface,
     },
     chart: {
-      borderRadius: 8,
       marginVertical: 8,
+      borderRadius: 16,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 16,
+    },
+    timelineProgress: {
+      flexDirection: 'row',
+      height: 8,
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginTop: 24,
+      marginBottom: 8,
+    },
+    timelineRow: {
+      flexDirection: 'row',
+      marginBottom: 24,
+    },
+    timelineTime: {
+      color: theme.colors.onSurface,
+      fontSize: 17,
+      fontWeight: '600',
+    },
+    timelinePhaseLabel: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 14,
+    },
+    timelineMetrics: {
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 16,
+      padding: 16,
+      gap: 16,
+      marginTop: 16,
+    },
+    timelineMetric: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    timelineMetricIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'white',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    timelineMetricText: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 14,
+    },
+    timelineMetricValue: {
+      color: theme.colors.onSurface,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    timeMarkers: {
+      position: 'relative',
+      width: '100%',
+      marginTop: 4,
+    },
+    nowMarker: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      color: theme.colors.primary,
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    phaseMarkers: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      top: 0,
+      left: 0,
+      pointerEvents: 'none',
+    },
+    phaseMarker: {
+      position: 'absolute',
+      top: -150,
+      alignItems: 'center',
+    },
+    phaseMarkerLine: {
+      width: 1,
+      height: 150,
+      backgroundColor: theme.colors.primary,
+      opacity: 0.3,
+    },
+    phaseMarkerLabel: {
+      color: theme.colors.primary,
+      fontSize: 12,
+      fontWeight: '500',
+      marginTop: 4,
+      opacity: 0.7,
+    },
+    nowIndicator: {
+      position: 'absolute',
+      left: 12,
+      bottom: 4,
+    },
+    nowLabel: {
+      color: theme.colors.primary,
+      fontSize: 12,
+      fontWeight: '500',
     },
   });
 
