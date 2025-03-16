@@ -1,4 +1,7 @@
 {
+  "cli": {
+    "appVersionSource": "remote"
+  },
   "build": {
     "preview": {
       "android": {
@@ -24,7 +27,8 @@
       "ios": {
         "simulator": false
       },
-      "env": {}
+      "env": {},
+      "autoIncrement": true
     }
   }
 }

@@ -41,9 +41,10 @@
       "url": "https://u.expo.dev/8672c25c-0517-4819-bb0a-9bdc33f8596c"
     },
     "owner": "tripsit",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "android": {
-      "package": "me.tripsit.mobile"
+      "package": "me.tripsit.mobile",
+      "versionCode": 31
     }
   }
 }
