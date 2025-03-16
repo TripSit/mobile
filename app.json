@@ -24,7 +24,16 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 25
+          }
+        }
+      ],
+      "@logrocket/react-native"
     ],
     "experiments": {
       "typedRoutes": true
@@ -44,7 +53,13 @@
     "newArchEnabled": true,
     "android": {
       "package": "me.tripsit.mobile",
-      "versionCode": 31
+      "versionCode": 32
+    },
+    "ios": {
+      "bundleIdentifier": "me.tripsit.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     }
   }
 }
