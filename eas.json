@@ -1,36 +1,32 @@
 {
-    "cli": {
-      "version": ">= 5.9.1"
-    },
-    "build": {
-      "development": {
-        "developmentClient": true,
-        "distribution": "internal",
-        "env": {
-          "EXPO_PUBLIC_POSTHOG_KEY": "phc_nybI8ZUbk1MJalTcu7R821IBrpRcQSHYGSh0lg4JkdR",
-          "EXPO_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com"
-        }
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk"
       },
-      "preview": {
-        "distribution": "internal"
-      },
-      "preview2": {
-        "android": {
-          "gradleCommand": ":app:assembleRelease"
-        }
-      },
-      "preview3": {
-        "developmentClient": true
-      },
-      "preview4": {
-        "distribution": "internal"
-      },
-      "production": {
-        "autoIncrement": true
+      "env": {
       }
     },
-    "submit": {
-      "production": {}
+    "preview2": {
+      "android": {
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+      }
+    },
+    "preview3": {
+      "developmentClient": true,
+      "env": {
+      }
+    },
+    "preview4": {
+      "distribution": "internal",
+      "env": {
+      }
+    },
+    "production": {
+      "env": {
+      }
     }
   }
-  
+}
