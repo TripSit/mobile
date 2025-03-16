@@ -31,6 +31,12 @@ local.properties
 *.iml
 *.hprof
 
+# Android Studio & Gradle
+android
+android-studio
+.gradle
+
+
 # Expo
 .expo/
 dist/
@@ -102,3 +108,13 @@ assets/images/tripsit_banner.png
 certificate_for_google.pem
 
 keystore.jks
+android
+ios
+android
+ios
+
+bundletool.jar
+
+*.aab
+
+extracted-apks/

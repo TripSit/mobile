@@ -2,7 +2,7 @@
   "expo": {
     "name": "TripSit",
     "slug": "TripSit",
-    "version": "12.0.6",
+    "version": "12.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -12,22 +12,11 @@
       "resizeMode": "contain",
       "backgroundColor": "#060606"
     },
-    "ios": {
-      "supportsTablet": true,
-      "runtimeVersion": {
-        "policy": "appVersion"
-      },
-      "bundleIdentifier": "me.tripsit.mobile"
-    },
-    "android": {
-      "versionCode": 26,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "me.tripsit.mobile",
-      "runtimeVersion": "12.0.6"
-    },
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -52,6 +41,9 @@
       "url": "https://u.expo.dev/8672c25c-0517-4819-bb0a-9bdc33f8596c"
     },
     "owner": "tripsit",
-    "newArchEnabled": true
+    "newArchEnabled": false,
+    "android": {
+      "package": "me.tripsit.mobile"
+    }
   }
 }

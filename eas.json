@@ -4,29 +4,27 @@
       "android": {
         "buildType": "apk"
       },
-      "env": {
-      }
-    },
-    "preview2": {
-      "android": {
-        "gradleCommand": ":app:assembleRelease"
+      "ios": {
+        "simulator": true
       },
-      "env": {
-      }
+      "env": {}
     },
-    "preview3": {
+    "development": {
       "developmentClient": true,
-      "env": {
-      }
+      "env": {}
     },
-    "preview4": {
+    "internal": {
       "distribution": "internal",
-      "env": {
-      }
+      "env": {}
     },
     "production": {
-      "env": {
-      }
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "env": {}
     }
   }
 }
