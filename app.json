@@ -53,7 +53,7 @@
     "newArchEnabled": true,
     "android": {
       "package": "me.tripsit.mobile",
-      "versionCode": 32
+      "versionCode": 33
     },
     "ios": {
       "bundleIdentifier": "me.tripsit.mobile",
